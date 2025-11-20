@@ -9,6 +9,9 @@ interface ResultCardProps {
 }
 
 export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onReset }) => {
+  // Adjust font size if multiple emojis (group result)
+  const emojiFontSize = result.emoji && [...result.emoji].length > 2 ? 'text-4xl' : 'text-6xl';
+
   return (
     <div className="flex flex-col items-center w-full max-w-md mx-auto animate-fade-in">
       <div className="relative w-full bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border border-purple-500/30">
@@ -24,7 +27,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
            
            <div className="absolute bottom-0 right-0 left-0 p-6 text-center">
                 <div className="inline-block animate-bounce bg-white/10 backdrop-blur-md border border-white/20 rounded-full px-6 py-2 shadow-lg">
-                    <span className="text-6xl filter drop-shadow-lg">{result.emoji}</span>
+                    <span className={`${emojiFontSize} filter drop-shadow-lg`}>{result.emoji}</span>
                 </div>
            </div>
         </div>
@@ -32,16 +35,16 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
         {/* Content Section */}
         <div className="p-6 pt-2 text-center space-y-4">
             <div>
-                <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 mb-1">
+                <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 mb-1 leading-tight">
                     {result.animal}
                 </h2>
-                <span className="inline-block px-3 py-1 text-xs font-bold rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                <span className="inline-block px-3 py-1 text-xs font-bold rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 mt-2">
                     درجه سوختگی: {result.roastLevel}
                 </span>
             </div>
 
             <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                <p className="text-lg text-gray-200 leading-relaxed font-medium">
+                <p className="text-lg text-gray-200 leading-relaxed font-medium" dir="rtl">
                     {result.description}
                 </p>
             </div>
@@ -59,8 +62,8 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
                     onClick={() => {
                         if (navigator.share) {
                             navigator.share({
-                                title: 'حیوان درون من',
-                                text: `من شبیه ${result.animal} هستم! ${result.description}`,
+                                title: 'حیوان درون ما',
+                                text: `ما شبیه ${result.animal} هستیم! ${result.description}`,
                             }).catch(console.error);
                         } else {
                             alert('اشتراک‌گذاری در این مرورگر پشتیبانی نمی‌شود');

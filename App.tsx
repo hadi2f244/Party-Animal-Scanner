@@ -1,26 +1,59 @@
 import React, { useState } from 'react';
-import { Camera, Upload, Sparkles, PartyPopper } from 'lucide-react';
-import { analyzePartyGuest } from './services/geminiService';
+import { Camera, Upload, Sparkles, PartyPopper, CheckCircle2, Circle, ArrowLeft } from 'lucide-react';
+import { analyzePartyGuest, detectPeopleInImage } from './services/geminiService';
 import { CameraView } from './components/CameraView';
 import { ResultCard } from './components/ResultCard';
-import { AnimalResult, AppState } from './types';
+import { AnimalResult, AppState, PersonDetected } from './types';
 
 export const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.HOME);
   const [imageSrc, setImageSrc] = useState<string>('');
   const [result, setResult] = useState<AnimalResult | null>(null);
-  const [loadingMessage, setLoadingMessage] = useState<string>('در حال ارسال به باغ‌وحش...');
+  const [loadingMessage, setLoadingMessage] = useState<string>('در حال پردازش...');
+  
+  // New state for selection flow
+  const [detectedPeople, setDetectedPeople] = useState<PersonDetected[]>([]);
+  const [selectedPeopleIds, setSelectedPeopleIds] = useState<Set<string>>(new Set());
 
   const funnyLoadingMessages = [
-    "در حال اسکن کردن شخصیت...",
+    "در حال اسکن چهره‌ها...",
     "تماس با کارشناسان حیات وحش...",
-    "مقایسه با میمون‌های جنگلی...",
-    "تحلیل زاویه فک و بینی...",
+    "مقایسه با قبیله‌های جنگلی...",
+    "تحلیل میمیک صورت...",
     "جستجو در دیتابیس حیوانات...",
   ];
 
+  // Step 1: Image Selected/Captured -> Detect People
   const handleImageSelected = async (src: string) => {
     setImageSrc(src);
+    setAppState(AppState.LOADING);
+    setLoadingMessage("در حال شناسایی افراد...");
+    
+    try {
+      const people = await detectPeopleInImage(src);
+      
+      if (people.length === 0) {
+        // Fallback if no specific people detected, just run analysis generally
+        runAnalysis(src, []); 
+      } else if (people.length === 1) {
+        // If only one person, just select them and run
+        runAnalysis(src, [people[0].label]);
+      } else {
+        // Multiple people found, go to selection screen
+        setDetectedPeople(people);
+        // Auto-select all by default
+        setSelectedPeopleIds(new Set(people.map(p => p.id)));
+        setAppState(AppState.SELECTION);
+      }
+    } catch (error) {
+      console.error("Detection error", error);
+      // If detection fails, try to just run analysis anyway
+      runAnalysis(src, []);
+    }
+  };
+
+  // Step 2: Analyze based on selection
+  const runAnalysis = async (src: string, focusLabels: string[]) => {
     setAppState(AppState.LOADING);
     
     // Cycle through loading messages
@@ -29,7 +62,7 @@ export const App: React.FC = () => {
     }, 2000);
 
     try {
-      const analysisResult = await analyzePartyGuest(src);
+      const analysisResult = await analyzePartyGuest(src, focusLabels);
       setResult(analysisResult);
       setAppState(AppState.RESULT);
     } catch (error) {
@@ -40,16 +73,73 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
+  const handleSelectionConfirm = () => {
+    const selectedLabels = detectedPeople
+      .filter(p => selectedPeopleIds.has(p.id))
+      .map(p => p.label);
+      
+    if (selectedLabels.length === 0) {
+        alert("لطفا حداقل یک نفر را انتخاب کنید");
+        return;
+    }
+
+    runAnalysis(imageSrc, selectedLabels);
+  };
+
+  const togglePersonSelection = (id: string) => {
+    const newSet = new Set(selectedPeopleIds);
+    if (newSet.has(id)) {
+        newSet.delete(id);
+    } else {
+        newSet.add(id);
+    }
+    setSelectedPeopleIds(newSet);
+  };
+
+  const resizeImage = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === 'string') {
-          handleImageSelected(reader.result);
-        }
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_SIZE = 1024;
+          let w = img.width;
+          let h = img.height;
+          
+          if (w > h) {
+            if (w > MAX_SIZE) {
+              h = Math.round(h * (MAX_SIZE / w));
+              w = MAX_SIZE;
+            }
+          } else {
+            if (h > MAX_SIZE) {
+              w = Math.round(w * (MAX_SIZE / h));
+              h = MAX_SIZE;
+            }
+          }
+          
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', 0.7));
+        };
+        img.src = e.target?.result as string;
       };
       reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+        try {
+            const resizedImage = await resizeImage(file);
+            handleImageSelected(resizedImage);
+        } catch (e) {
+            console.error("Error processing image", e);
+        }
     }
   };
 
@@ -57,6 +147,7 @@ export const App: React.FC = () => {
     setAppState(AppState.HOME);
     setImageSrc('');
     setResult(null);
+    setDetectedPeople([]);
   };
 
   return (
@@ -84,7 +175,7 @@ export const App: React.FC = () => {
                     حیوان درونت چیه؟
                 </h1>
                 <p className="text-gray-400 text-lg">
-                    از مهمونا عکس بگیر تا هوش مصنوعی بگه شبیه چه حیوونی هستن!
+                    از مهمونا (تکی یا گروهی) عکس بگیر تا هوش مصنوعی بگه شبیه چه حیوونی هستن!
                 </p>
             </div>
 
@@ -118,6 +209,58 @@ export const App: React.FC = () => {
             onCapture={handleImageSelected} 
             onClose={() => setAppState(AppState.HOME)}
         />
+      )}
+
+      {appState === AppState.SELECTION && (
+        <div className="w-full max-w-md flex flex-col items-center min-h-[80vh] animate-fade-in">
+            <h2 className="text-2xl font-bold mb-6">کیا رو تحلیل کنم؟</h2>
+            
+            <div className="relative w-full h-56 mb-6 rounded-2xl overflow-hidden border border-white/10 shadow-lg">
+                 <img src={imageSrc} alt="Preview" className="w-full h-full object-cover" />
+                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+            </div>
+
+            <div className="w-full space-y-3 mb-8 px-2 overflow-y-auto max-h-60 no-scrollbar">
+                {detectedPeople.map((person) => (
+                    <div 
+                        key={person.id}
+                        onClick={() => togglePersonSelection(person.id)}
+                        className={`p-4 rounded-xl flex items-center justify-between cursor-pointer transition-all duration-200 border ${
+                            selectedPeopleIds.has(person.id) 
+                            ? 'bg-purple-600/30 border-purple-500' 
+                            : 'bg-gray-800/50 border-gray-700 hover:bg-gray-800'
+                        }`}
+                    >
+                        <span className="text-lg">{person.label}</span>
+                        {selectedPeopleIds.has(person.id) ? (
+                            <CheckCircle2 className="text-green-400 w-6 h-6" />
+                        ) : (
+                            <Circle className="text-gray-500 w-6 h-6" />
+                        )}
+                    </div>
+                ))}
+            </div>
+
+            <div className="flex gap-4 w-full mt-auto">
+                <button 
+                    onClick={resetApp}
+                    className="p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+                >
+                    <ArrowLeft />
+                </button>
+                <button 
+                    onClick={handleSelectionConfirm}
+                    disabled={selectedPeopleIds.size === 0}
+                    className={`flex-1 py-4 rounded-xl font-bold text-lg transition shadow-lg ${
+                        selectedPeopleIds.size > 0
+                        ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-purple-900/40 hover:scale-[1.02]'
+                        : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+                    }`}
+                >
+                    {selectedPeopleIds.size > 0 ? 'بزن بریم!' : 'انتخاب کن'}
+                </button>
+            </div>
+        </div>
       )}
 
       {appState === AppState.LOADING && (
@@ -164,3 +307,5 @@ export const App: React.FC = () => {
     </div>
   );
 };
+
+export default App;

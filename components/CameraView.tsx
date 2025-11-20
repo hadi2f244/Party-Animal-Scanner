@@ -49,17 +49,36 @@ export const CameraView: React.FC<CameraViewProps> = ({ onCapture, onClose }) =>
       const context = canvasRef.current.getContext('2d');
       if (context) {
         const { videoWidth, videoHeight } = videoRef.current;
-        canvasRef.current.width = videoWidth;
-        canvasRef.current.height = videoHeight;
+        
+        // Resize to reduce payload size (max 1024px)
+        const MAX_SIZE = 1024;
+        let width = videoWidth;
+        let height = videoHeight;
+
+        if (width > height) {
+            if (width > MAX_SIZE) {
+                height = Math.round(height * (MAX_SIZE / width));
+                width = MAX_SIZE;
+            }
+        } else {
+            if (height > MAX_SIZE) {
+                width = Math.round(width * (MAX_SIZE / height));
+                height = MAX_SIZE;
+            }
+        }
+
+        canvasRef.current.width = width;
+        canvasRef.current.height = height;
         
         // Flip horizontally if using front camera for mirror effect
         if (facingMode === 'user') {
-            context.translate(videoWidth, 0);
+            context.translate(width, 0);
             context.scale(-1, 1);
         }
 
-        context.drawImage(videoRef.current, 0, 0, videoWidth, videoHeight);
-        const imageSrc = canvasRef.current.toDataURL('image/jpeg', 0.8);
+        context.drawImage(videoRef.current, 0, 0, width, height);
+        // Compress to 0.7 quality JPEG
+        const imageSrc = canvasRef.current.toDataURL('image/jpeg', 0.7);
         onCapture(imageSrc);
       }
     }

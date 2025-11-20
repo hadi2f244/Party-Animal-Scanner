@@ -5,10 +5,16 @@ export interface AnimalResult {
   roastLevel: string;
 }
 
+export interface PersonDetected {
+  id: string;
+  label: string; // e.g. "مرد با پیراهن قرمز"
+}
+
 export enum AppState {
   HOME = 'HOME',
   CAMERA = 'CAMERA',
   LOADING = 'LOADING',
+  SELECTION = 'SELECTION',
   RESULT = 'RESULT',
   ERROR = 'ERROR'
 }
