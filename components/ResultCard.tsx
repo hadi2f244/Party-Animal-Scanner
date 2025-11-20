@@ -1,12 +1,13 @@
+
 import React, { useState, useRef } from 'react';
 import { AnimalResult } from '../types';
 import { Share2, RotateCcw, Volume2, Loader2, StopCircle } from 'lucide-react';
-import { generateRoastAudio } from '../services/geminiService';
 
 interface ResultCardProps {
   result: AnimalResult;
   imageSrc: string;
   onReset: () => void;
+  customAudioGenerator: (text: string) => Promise<string>;
 }
 
 // Audio Helper Functions
@@ -39,7 +40,7 @@ async function decodeAudioData(
   return buffer;
 }
 
-export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onReset }) => {
+export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onReset, customAudioGenerator }) => {
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -71,8 +72,8 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
         await audioContextRef.current.resume();
       }
 
-      // Fetch Audio from Gemini
-      const base64Audio = await generateRoastAudio(result.description);
+      // Fetch Audio using the custom generator (which injects the settings)
+      const base64Audio = await customAudioGenerator(result.description);
       
       // Decode and Play
       const audioBytes = decode(base64Audio);

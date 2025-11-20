@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { AnimalResult, PersonDetected } from "../types";
+import { AnimalResult, PersonDetected, StoryResult } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -60,14 +61,17 @@ export const detectPeopleInImage = async (base64Image: string): Promise<PersonDe
   }
 };
 
-export const analyzePartyGuest = async (base64Image: string, focusOn: string[] = []): Promise<AnimalResult> => {
+export const analyzePartyGuest = async (base64Image: string, focusOn: string[], customPrompt: string): Promise<AnimalResult> => {
   // Clean the base64 string if it has the header
   const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
 
-  let prompt = `You are a funny party entertainer. Look at this photo.`;
+  // Use the custom prompt as the base instructions
+  let prompt = `${customPrompt}`;
   
   if (focusOn.length > 0) {
     prompt += `
+    
+    IMPORTANT INSTRUCTION:
     FOCUS ONLY on these specific people described here: ${focusOn.join(", ")}.
     Ignore anyone else in the background.
     
@@ -76,17 +80,16 @@ export const analyzePartyGuest = async (base64Image: string, focusOn: string[] =
     In the description, briefly roast these specific people based on their visual traits.`;
   } else {
     prompt += `
+    
+    IMPORTANT INSTRUCTION:
     If there is ONE person:
-    Decide what animal they resemble based on their expression, vibe, or physical features.
+    Decide what animal they resemble.
     
     If there are MULTIPLE people:
     Describe them as a group. Assign a collective animal theme.`;
   }
 
   prompt += `
-    Tone: Humorous, witty, and slightly "roasting" (make fun of them playfully) but keep it friendly for a party. 
-    Language: Persian (Farsi).
-    
     Return the result in this strict JSON structure:`;
 
   try {
@@ -141,13 +144,13 @@ export const analyzePartyGuest = async (base64Image: string, focusOn: string[] =
   }
 };
 
-export const generateRoastAudio = async (text: string): Promise<string> => {
+export const generateRoastAudio = async (text: string, stylePrompt: string): Promise<string> => {
+  // We include the text directly in the prompt to be read.
   const prompt = `
-  Read the following Persian text with a very cheerful, funny, and energetic "Party Host" tone. 
-  You should sound like you are roasting someone affectionately at a party. 
-  Feel free to chuckle or sound amused while speaking.
+  ${stylePrompt}
   
-  Text to read: "${text}"
+  Here is the text to read:
+  "${text}"
   `;
 
   try {
@@ -170,6 +173,81 @@ export const generateRoastAudio = async (text: string): Promise<string> => {
     return base64Audio;
   } catch (error) {
     console.error("Audio Generation Failed:", error);
+    throw error;
+  }
+};
+
+export const generatePartyStory = async (base64Images: string[], customPrompt: string): Promise<StoryResult> => {
+  // Prepare parts: images + prompt
+  const parts: any[] = [];
+  
+  base64Images.forEach(img => {
+    const cleanBase64 = img.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
+    parts.push({
+      inlineData: {
+        mimeType: 'image/jpeg',
+        data: cleanBase64
+      }
+    });
+  });
+
+  const prompt = `
+    ${customPrompt}
+
+    I have provided ${base64Images.length} photos in order.
+    
+    Rules:
+    1. Create a Title for the story (Must be Jungle/Adventure themed).
+    2. For EACH photo, visually identify the "Animal" the person looks like.
+    3. Write a paragraph of the story (in Persian) centered around this animal character in the jungle.
+    4. The story must flow logically from photo 1 to photo 2.
+    
+    Return JSON:
+    {
+      "title": "Story Title",
+      "pages": [
+        { "imageIndex": 0, "text": "Story part for first photo..." },
+        { "imageIndex": 1, "text": "Story part for second photo..." }
+        ...
+      ]
+    }
+  `;
+  
+  parts.push({ text: prompt });
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: { parts: parts },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            pages: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  imageIndex: { type: Type.INTEGER },
+                  text: { type: Type.STRING }
+                },
+                required: ["imageIndex", "text"]
+              }
+            }
+          },
+          required: ["title", "pages"]
+        }
+      }
+    });
+
+    const text = response.text;
+    if (!text) throw new Error("No response text");
+    return JSON.parse(text) as StoryResult;
+
+  } catch (error) {
+    console.error("Story Generation Failed:", error);
     throw error;
   }
 };

@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
-import { Camera, Upload, Sparkles, PartyPopper, CheckCircle2, Circle, ArrowLeft } from 'lucide-react';
-import { analyzePartyGuest, detectPeopleInImage } from './services/geminiService';
+
+import React, { useState, useEffect } from 'react';
+import { Camera, Upload, Sparkles, PartyPopper, CheckCircle2, Circle, ArrowLeft, BookOpen, Clock, Loader2, Settings } from 'lucide-react';
+import { analyzePartyGuest, detectPeopleInImage, generatePartyStory, generateRoastAudio } from './services/geminiService';
 import { CameraView } from './components/CameraView';
 import { ResultCard } from './components/ResultCard';
-import { AnimalResult, AppState, PersonDetected } from './types';
+import { StoryPlayer } from './components/StoryPlayer';
+import { SettingsView } from './components/SettingsView';
+import { AnimalResult, AppState, PersonDetected, StoryResult, LoadingProgress, AppSettings, DEFAULT_SETTINGS } from './types';
 
 export const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.HOME);
@@ -11,9 +14,35 @@ export const App: React.FC = () => {
   const [result, setResult] = useState<AnimalResult | null>(null);
   const [loadingMessage, setLoadingMessage] = useState<string>('در حال پردازش...');
   
-  // New state for selection flow
+  // Selection flow state
   const [detectedPeople, setDetectedPeople] = useState<PersonDetected[]>([]);
   const [selectedPeopleIds, setSelectedPeopleIds] = useState<Set<string>>(new Set());
+
+  // Story Mode State
+  const [storyImages, setStoryImages] = useState<string[]>([]);
+  const [storyResult, setStoryResult] = useState<StoryResult | null>(null);
+  const [loadingProgress, setLoadingProgress] = useState<LoadingProgress | null>(null);
+
+  // Settings State
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+
+  // Load settings from local storage on mount
+  useEffect(() => {
+    const savedSettings = localStorage.getItem('partyApp_settings_v2');
+    if (savedSettings) {
+        try {
+            setSettings(JSON.parse(savedSettings));
+        } catch (e) {
+            console.error("Failed to parse settings", e);
+        }
+    }
+  }, []);
+
+  const saveSettings = (newSettings: AppSettings) => {
+      setSettings(newSettings);
+      localStorage.setItem('partyApp_settings_v2', JSON.stringify(newSettings));
+      setAppState(AppState.HOME);
+  };
 
   const funnyLoadingMessages = [
     "در حال اسکن چهره‌ها...",
@@ -23,7 +52,8 @@ export const App: React.FC = () => {
     "جستجو در دیتابیس حیوانات...",
   ];
 
-  // Step 1: Image Selected/Captured -> Detect People
+  // --- Standard Mode Functions ---
+
   const handleImageSelected = async (src: string) => {
     setImageSrc(src);
     setAppState(AppState.LOADING);
@@ -33,36 +63,29 @@ export const App: React.FC = () => {
       const people = await detectPeopleInImage(src);
       
       if (people.length === 0) {
-        // Fallback if no specific people detected, just run analysis generally
         runAnalysis(src, []); 
       } else if (people.length === 1) {
-        // If only one person, just select them and run
         runAnalysis(src, [people[0].label]);
       } else {
-        // Multiple people found, go to selection screen
         setDetectedPeople(people);
-        // Auto-select all by default
         setSelectedPeopleIds(new Set(people.map(p => p.id)));
         setAppState(AppState.SELECTION);
       }
     } catch (error) {
       console.error("Detection error", error);
-      // If detection fails, try to just run analysis anyway
       runAnalysis(src, []);
     }
   };
 
-  // Step 2: Analyze based on selection
   const runAnalysis = async (src: string, focusLabels: string[]) => {
     setAppState(AppState.LOADING);
-    
-    // Cycle through loading messages
     const msgInterval = setInterval(() => {
         setLoadingMessage(funnyLoadingMessages[Math.floor(Math.random() * funnyLoadingMessages.length)]);
     }, 2000);
 
     try {
-      const analysisResult = await analyzePartyGuest(src, focusLabels);
+      // Pass custom prompt from settings
+      const analysisResult = await analyzePartyGuest(src, focusLabels, settings.analysisPrompt);
       setResult(analysisResult);
       setAppState(AppState.RESULT);
     } catch (error) {
@@ -95,6 +118,89 @@ export const App: React.FC = () => {
     }
     setSelectedPeopleIds(newSet);
   };
+
+  // --- Story Mode Functions ---
+
+  const startStoryMode = () => {
+    setStoryImages([]);
+    setAppState(AppState.STORY_CAPTURE);
+  };
+
+  const handleStoryCaptureFinish = async (images: string[]) => {
+    setStoryImages(images);
+    setAppState(AppState.STORY_LOADING);
+    
+    // Estimated steps: 1 (Text Gen) + Images (Voice)
+    const totalSteps = 1 + images.length;
+    let currentStep = 0;
+
+    const updateProgress = (msg: string) => {
+        currentStep++;
+        // Rough estimate: Text=4s, Audio=3s per clip
+        const remainingSteps = totalSteps - currentStep;
+        const estimatedTime = remainingSteps * 3; 
+        
+        setLoadingProgress({
+            currentStep,
+            totalSteps,
+            message: msg,
+            timeLeftSeconds: estimatedTime < 0 ? 0 : estimatedTime
+        });
+    };
+
+    setLoadingProgress({
+        currentStep: 0,
+        totalSteps,
+        message: "در حال نوشتن سناریوی طنز...",
+        timeLeftSeconds: totalSteps * 3
+    });
+
+    try {
+        // 1. Generate Text Story (Pass custom prompt)
+        const story = await generatePartyStory(images, settings.storyPrompt);
+        updateProgress("سناریو نوشته شد! در حال ضبط صدا...");
+
+        // 2. Pre-load Audio for each page
+        const pagesWithAudio = [];
+        
+        for (let i = 0; i < story.pages.length; i++) {
+            const page = story.pages[i];
+            
+            // Generate Narration (Pass custom TTS style)
+            updateProgress(`ضبط صدای صفحه ${i + 1} از ${story.pages.length}...`);
+            let audioBase64 = "";
+            try {
+                audioBase64 = await generateRoastAudio(page.text, settings.ttsStylePrompt);
+            } catch (e) {
+                console.warn("Audio generation failed for page " + i);
+            }
+
+            pagesWithAudio.push({
+                ...page,
+                audioBase64
+            });
+        }
+
+        setStoryResult({ ...story, pages: pagesWithAudio });
+        setAppState(AppState.STORY_PLAY);
+
+    } catch (error) {
+        console.error(error);
+        setAppState(AppState.ERROR);
+    } finally {
+        setLoadingProgress(null);
+    }
+  };
+
+  // --- Result Actions ---
+
+  // To keep it clean, I'll pass a wrapper function to ResultCard.
+  const playResultAudio = async (text: string): Promise<string> => {
+      return await generateRoastAudio(text, settings.ttsStylePrompt);
+  }
+
+
+  // --- Shared Functions ---
 
   const resizeImage = (file: File): Promise<string> => {
     return new Promise((resolve) => {
@@ -148,6 +254,9 @@ export const App: React.FC = () => {
     setImageSrc('');
     setResult(null);
     setDetectedPeople([]);
+    setStoryImages([]);
+    setStoryResult(null);
+    setLoadingProgress(null);
   };
 
   return (
@@ -166,7 +275,15 @@ export const App: React.FC = () => {
       />
 
       {appState === AppState.HOME && (
-        <div className="w-full max-w-md flex flex-col items-center justify-center min-h-[80vh] space-y-12 animate-fade-in">
+        <div className="w-full max-w-md flex flex-col items-center justify-center min-h-[80vh] space-y-8 animate-fade-in relative">
+            {/* Settings Button */}
+            <button 
+                onClick={() => setAppState(AppState.SETTINGS)}
+                className="absolute top-0 right-0 p-3 bg-white/10 hover:bg-white/20 rounded-full text-gray-300 hover:text-white transition backdrop-blur-sm z-10"
+            >
+                <Settings className="w-6 h-6" />
+            </button>
+
             <div className="text-center space-y-4">
                 <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-tr from-yellow-400 to-orange-500 shadow-lg shadow-orange-500/20 mb-4 transform rotate-12">
                     <PartyPopper className="w-10 h-10 text-white" />
@@ -175,39 +292,77 @@ export const App: React.FC = () => {
                     حیوان درونت چیه؟
                 </h1>
                 <p className="text-gray-400 text-lg">
-                    از مهمونا (تکی یا گروهی) عکس بگیر تا هوش مصنوعی بگه شبیه چه حیوونی هستن!
+                    ابزار هوشمند برای سرگرمی مهمونی‌ها
                 </p>
             </div>
 
             <div className="w-full space-y-4">
                 <button 
                     onClick={() => setAppState(AppState.CAMERA)}
-                    className="w-full group relative flex items-center justify-center gap-4 p-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 transition-all duration-200 transform hover:scale-[1.02] shadow-xl shadow-purple-900/30"
+                    className="w-full group flex items-center justify-between p-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 transition-all duration-200 transform hover:scale-[1.02] shadow-xl shadow-blue-900/30"
                 >
+                    <div className="text-right">
+                        <span className="block text-xl font-bold">تحلیل تکی/گروهی</span>
+                        <span className="text-indigo-200 text-sm">یه عکس بگیر و ببین شبیه چی هستن!</span>
+                    </div>
                     <div className="bg-white/20 p-3 rounded-full">
                         <Camera className="w-8 h-8 text-white" />
-                    </div>
-                    <div className="text-right">
-                        <span className="block text-xl font-bold">عکس گرفتن</span>
-                        <span className="text-indigo-200 text-sm">دوربین رو باز کن</span>
                     </div>
                 </button>
 
                 <button 
-                    onClick={() => document.getElementById('file-upload')?.click()}
-                    className="w-full flex items-center justify-center gap-3 p-5 rounded-2xl bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
+                    onClick={startStoryMode}
+                    className="w-full group flex items-center justify-between p-6 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 transition-all duration-200 transform hover:scale-[1.02] shadow-xl shadow-pink-900/30"
                 >
-                    <Upload className="w-6 h-6 text-gray-400" />
+                    <div className="text-right">
+                        <span className="block text-xl font-bold">داستان‌سازی خودکار</span>
+                        <span className="text-pink-200 text-sm">چند تا عکس بگیر تا برات قصه بسازم</span>
+                    </div>
+                    <div className="bg-white/20 p-3 rounded-full">
+                        <BookOpen className="w-8 h-8 text-white" />
+                    </div>
+                </button>
+                
+                <button 
+                    onClick={() => document.getElementById('file-upload')?.click()}
+                    className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
+                >
+                    <Upload className="w-5 h-5 text-gray-400" />
                     <span className="font-semibold text-gray-300">آپلود از گالری</span>
                 </button>
             </div>
         </div>
       )}
 
+      {appState === AppState.SETTINGS && (
+        <SettingsView 
+            currentSettings={settings} 
+            onSave={saveSettings} 
+            onClose={() => setAppState(AppState.HOME)} 
+        />
+      )}
+
       {appState === AppState.CAMERA && (
         <CameraView 
             onCapture={handleImageSelected} 
             onClose={() => setAppState(AppState.HOME)}
+        />
+      )}
+
+      {appState === AppState.STORY_CAPTURE && (
+        <CameraView 
+            onCapture={() => {}} // Not used in multi-mode directly
+            onClose={() => setAppState(AppState.HOME)}
+            multiMode={true}
+            onMultiCaptureFinish={handleStoryCaptureFinish}
+        />
+      )}
+
+      {appState === AppState.STORY_PLAY && storyResult && (
+        <StoryPlayer 
+            images={storyImages}
+            story={storyResult}
+            onClose={resetApp}
         />
       )}
 
@@ -263,10 +418,15 @@ export const App: React.FC = () => {
         </div>
       )}
 
+      {/* General Loading State */}
       {appState === AppState.LOADING && (
         <div className="flex flex-col items-center justify-center min-h-[80vh] text-center space-y-8 animate-pulse">
             <div className="relative w-48 h-48">
-                <img src={imageSrc} alt="Scanning" className="w-full h-full object-cover rounded-full opacity-50 border-4 border-purple-500/30" />
+                {imageSrc ? (
+                     <img src={imageSrc} alt="Scanning" className="w-full h-full object-cover rounded-full opacity-50 border-4 border-purple-500/30" />
+                ) : (
+                     <div className="w-full h-full rounded-full bg-gray-800 opacity-50 border-4 border-purple-500/30"></div>
+                )}
                 <div className="absolute inset-0 border-t-4 border-purple-500 rounded-full animate-spin"></div>
                 <div className="absolute inset-0 flex items-center justify-center">
                     <Sparkles className="w-12 h-12 text-yellow-400 animate-bounce" />
@@ -279,11 +439,50 @@ export const App: React.FC = () => {
         </div>
       )}
 
+      {/* Story Loading State (Detailed) */}
+      {appState === AppState.STORY_LOADING && loadingProgress && (
+        <div className="flex flex-col items-center justify-center min-h-[80vh] w-full max-w-md animate-fade-in px-6">
+             <div className="w-full bg-gray-800/50 rounded-2xl p-6 border border-white/10 shadow-2xl backdrop-blur-sm">
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-bold text-purple-300 flex items-center gap-2">
+                        <Sparkles className="w-5 h-5" />
+                        ساخت داستان
+                    </h3>
+                    <div className="flex items-center gap-1 text-sm text-gray-400 bg-black/30 px-3 py-1 rounded-full">
+                        <Clock className="w-4 h-4" />
+                        <span>~{Math.ceil(loadingProgress.timeLeftSeconds)} ثانیه</span>
+                    </div>
+                </div>
+                
+                {/* Thumbnails */}
+                <div className="flex gap-2 mb-8 overflow-hidden justify-center">
+                    {storyImages.slice(0, 4).map((img, i) => (
+                        <img key={i} src={img} className="w-12 h-12 rounded-lg object-cover border border-white/20 opacity-60" />
+                    ))}
+                    {storyImages.length > 4 && <div className="w-12 h-12 rounded-lg bg-gray-700 flex items-center justify-center text-xs">+{storyImages.length - 4}</div>}
+                </div>
+
+                {/* Progress Bar */}
+                <div className="relative w-full h-3 bg-gray-700 rounded-full overflow-hidden mb-4">
+                    <div 
+                        className="absolute top-0 left-0 h-full bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-500 transition-all duration-500 ease-out"
+                        style={{ width: `${(loadingProgress.currentStep / loadingProgress.totalSteps) * 100}%` }}
+                    ></div>
+                </div>
+
+                <p className="text-center text-white font-medium animate-pulse">
+                    {loadingProgress.message}
+                </p>
+             </div>
+        </div>
+      )}
+
       {appState === AppState.RESULT && result && (
         <ResultCard 
             result={result} 
             imageSrc={imageSrc} 
-            onReset={resetApp} 
+            onReset={resetApp}
+            customAudioGenerator={(text) => playResultAudio(text)}
         />
       )}
 
@@ -294,7 +493,7 @@ export const App: React.FC = () => {
             </div>
             <h3 className="text-2xl font-bold text-white">ای وای! نشد...</h3>
             <p className="text-gray-400 max-w-xs">
-                هوش مصنوعی نتونست چهره رو تشخیص بده یا اینترنتت ضعیفه. یه عکس دیگه بگیر!
+                هوش مصنوعی نتونست چهره رو تشخیص بده یا اینترنتت ضعیفه. دوباره تلاش کن!
             </p>
             <button 
                 onClick={resetApp}
