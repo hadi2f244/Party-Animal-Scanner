@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { AnimalResult } from '../types';
-import { Share2, RotateCcw, Camera } from 'lucide-react';
+import { Share2, RotateCcw, Volume2, Loader2, StopCircle } from 'lucide-react';
+import { generateRoastAudio } from '../services/geminiService';
 
 interface ResultCardProps {
   result: AnimalResult;
@@ -8,9 +9,100 @@ interface ResultCardProps {
   onReset: () => void;
 }
 
+// Audio Helper Functions
+function decode(base64: string) {
+  const binaryString = atob(base64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes;
+}
+
+async function decodeAudioData(
+  data: Uint8Array,
+  ctx: AudioContext,
+  sampleRate: number,
+  numChannels: number,
+): Promise<AudioBuffer> {
+  const dataInt16 = new Int16Array(data.buffer);
+  const frameCount = dataInt16.length / numChannels;
+  const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+
+  for (let channel = 0; channel < numChannels; channel++) {
+    const channelData = buffer.getChannelData(channel);
+    for (let i = 0; i < frameCount; i++) {
+      channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+    }
+  }
+  return buffer;
+}
+
 export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onReset }) => {
+  const [isLoadingAudio, setIsLoadingAudio] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
+
   // Adjust font size if multiple emojis (group result)
   const emojiFontSize = result.emoji && [...result.emoji].length > 2 ? 'text-4xl' : 'text-6xl';
+
+  const handlePlayAudio = async () => {
+    // If already playing, stop it
+    if (isPlaying) {
+      if (sourceNodeRef.current) {
+        sourceNodeRef.current.stop();
+        sourceNodeRef.current = null;
+      }
+      setIsPlaying(false);
+      return;
+    }
+
+    setIsLoadingAudio(true);
+
+    try {
+      // Initialize Audio Context on user gesture
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      }
+      
+      if (audioContextRef.current.state === 'suspended') {
+        await audioContextRef.current.resume();
+      }
+
+      // Fetch Audio from Gemini
+      const base64Audio = await generateRoastAudio(result.description);
+      
+      // Decode and Play
+      const audioBytes = decode(base64Audio);
+      const audioBuffer = await decodeAudioData(
+        audioBytes,
+        audioContextRef.current,
+        24000, // Gemini TTS uses 24k sample rate
+        1
+      );
+
+      const source = audioContextRef.current.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContextRef.current.destination);
+      
+      source.onended = () => {
+        setIsPlaying(false);
+        sourceNodeRef.current = null;
+      };
+
+      sourceNodeRef.current = source;
+      source.start();
+      setIsPlaying(true);
+
+    } catch (error) {
+      console.error("Error playing audio:", error);
+      alert("خطا در پخش صدا");
+    } finally {
+      setIsLoadingAudio(false);
+    }
+  };
 
   return (
     <div className="flex flex-col items-center w-full max-w-md mx-auto animate-fade-in">
@@ -43,10 +135,38 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
                 </span>
             </div>
 
-            <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                <p className="text-lg text-gray-200 leading-relaxed font-medium" dir="rtl">
+            <div className="bg-white/5 rounded-xl p-4 border border-white/10 relative">
+                <p className="text-lg text-gray-200 leading-relaxed font-medium mb-2" dir="rtl">
                     {result.description}
                 </p>
+                
+                <div className="flex justify-center mt-4 border-t border-white/10 pt-3">
+                   <button 
+                     onClick={handlePlayAudio}
+                     className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${
+                        isPlaying 
+                        ? "bg-red-500/20 text-red-400 border border-red-500/50"
+                        : "bg-purple-500/20 text-purple-300 border border-purple-500/50 hover:bg-purple-500/30"
+                     }`}
+                   >
+                     {isLoadingAudio ? (
+                        <>
+                            <Loader2 size={16} className="animate-spin" />
+                            <span>در حال ساخت ویس...</span>
+                        </>
+                     ) : isPlaying ? (
+                        <>
+                            <StopCircle size={16} />
+                            <span>توقف صدا</span>
+                        </>
+                     ) : (
+                        <>
+                            <Volume2 size={16} />
+                            <span>پخش توضیحات صوتی</span>
+                        </>
+                     )}
+                   </button>
+                </div>
             </div>
 
             {/* Action Buttons */}

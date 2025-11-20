@@ -1,5 +1,5 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { Camera, RefreshCw, Circle, X } from 'lucide-react';
+import React, { useRef, useEffect, useState } from 'react';
+import { RefreshCw, X } from 'lucide-react';
 
 interface CameraViewProps {
   onCapture: (imageSrc: string) => void;
@@ -9,39 +9,71 @@ interface CameraViewProps {
 export const CameraView: React.FC<CameraViewProps> = ({ onCapture, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
-  const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string>('');
 
-  const startCamera = useCallback(async () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-    }
-
-    try {
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: facingMode },
-        audio: false,
-      });
-      setStream(newStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = newStream;
-      }
-      setError('');
-    } catch (err) {
-      console.error("Error accessing camera:", err);
-      setError('دسترسی به دوربین امکان‌پذیر نیست. لطفا مجوزها را بررسی کنید.');
-    }
-  }, [facingMode]);
-
   useEffect(() => {
-    startCamera();
-    return () => {
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
+    let isMounted = true;
+    
+    const initCamera = async () => {
+      // Clean up existing stream if any before starting new one
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("مرورگر شما از دوربین پشتیبانی نمی‌کند");
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { 
+            facingMode: facingMode,
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          },
+          audio: false,
+        });
+
+        if (!isMounted) {
+          // If component unmounted while waiting for stream, stop it immediately
+          stream.getTracks().forEach(track => track.stop());
+          return;
+        }
+
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+        setError('');
+      } catch (err: any) {
+        console.error("Error accessing camera:", err);
+        if (isMounted) {
+          // Handle specific error names for better feedback
+          if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+             setError('دسترسی به دوربین رد شد. لطفا مجوز مرورگر را بررسی کنید.');
+          } else if (err.name === 'NotFoundError') {
+             setError('دوربین پیدا نشد.');
+          } else if (err.name === 'NotReadableError') {
+             setError('دوربین در حال استفاده است یا قابل دسترسی نیست.');
+          } else {
+             setError('خطا در اتصال به دوربین.');
+          }
+        }
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    initCamera();
+
+    return () => {
+      isMounted = false;
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+    };
   }, [facingMode]);
 
   const handleCapture = () => {
@@ -102,11 +134,13 @@ export const CameraView: React.FC<CameraViewProps> = ({ onCapture, onClose }) =>
       {/* Video Feed */}
       <div className="flex-1 relative flex items-center justify-center bg-black overflow-hidden">
         {error ? (
-          <div className="text-white text-center p-6">
-            <p className="mb-4 text-red-400">{error}</p>
+          <div className="text-white text-center p-6 max-w-xs mx-auto">
+            <div className="mb-4 text-red-400 bg-red-900/20 p-4 rounded-xl border border-red-500/30">
+                {error}
+            </div>
             <button 
-                onClick={() => startCamera()} 
-                className="bg-purple-600 px-4 py-2 rounded-lg"
+                onClick={() => setFacingMode(prev => prev)} // Trigger re-render/re-try
+                className="bg-purple-600 px-6 py-2 rounded-lg font-bold hover:bg-purple-500 transition"
             >
                 تلاش مجدد
             </button>
@@ -117,6 +151,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ onCapture, onClose }) =>
             ref={videoRef}
             autoPlay
             playsInline
+            muted
             className={`w-full h-full object-cover ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
           />
         )}
@@ -135,9 +170,10 @@ export const CameraView: React.FC<CameraViewProps> = ({ onCapture, onClose }) =>
         
         <button 
             onClick={handleCapture}
-            className="p-1 rounded-full border-4 border-white/80 hover:scale-105 transition-transform duration-200"
+            disabled={!!error}
+            className={`p-1 rounded-full border-4 transition-transform duration-200 ${error ? 'opacity-50 cursor-not-allowed border-gray-500' : 'border-white/80 hover:scale-105'}`}
         >
-            <div className="w-16 h-16 bg-white rounded-full border-2 border-black/20"></div>
+            <div className={`w-16 h-16 rounded-full border-2 border-black/20 ${error ? 'bg-gray-500' : 'bg-white'}`}></div>
         </button>
 
         <button 

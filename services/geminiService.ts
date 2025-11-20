@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { AnimalResult, PersonDetected } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -137,6 +137,39 @@ export const analyzePartyGuest = async (base64Image: string, focusOn: string[] =
 
   } catch (error) {
     console.error("Gemini Analysis Failed:", error);
+    throw error;
+  }
+};
+
+export const generateRoastAudio = async (text: string): Promise<string> => {
+  const prompt = `
+  Read the following Persian text with a very cheerful, funny, and energetic "Party Host" tone. 
+  You should sound like you are roasting someone affectionately at a party. 
+  Feel free to chuckle or sound amused while speaking.
+  
+  Text to read: "${text}"
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: prompt }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' },
+          },
+        },
+      },
+    });
+
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!base64Audio) throw new Error("No audio data returned");
+    
+    return base64Audio;
+  } catch (error) {
+    console.error("Audio Generation Failed:", error);
     throw error;
   }
 };
