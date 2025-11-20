@@ -28,10 +28,12 @@ export const App: React.FC = () => {
 
   // Load settings from local storage on mount
   useEffect(() => {
-    const savedSettings = localStorage.getItem('partyApp_settings_v2');
+    const savedSettings = localStorage.getItem('partyApp_settings_v5');
     if (savedSettings) {
         try {
-            setSettings(JSON.parse(savedSettings));
+            const parsed = JSON.parse(savedSettings);
+            // Merge with default to ensure new fields (like voiceName) exist if migrating from old version
+            setSettings({ ...DEFAULT_SETTINGS, ...parsed });
         } catch (e) {
             console.error("Failed to parse settings", e);
         }
@@ -40,16 +42,16 @@ export const App: React.FC = () => {
 
   const saveSettings = (newSettings: AppSettings) => {
       setSettings(newSettings);
-      localStorage.setItem('partyApp_settings_v2', JSON.stringify(newSettings));
+      localStorage.setItem('partyApp_settings_v5', JSON.stringify(newSettings));
       setAppState(AppState.HOME);
   };
 
   const funnyLoadingMessages = [
     "در حال اسکن چهره‌ها...",
-    "تماس با کارشناسان حیات وحش...",
-    "مقایسه با قبیله‌های جنگلی...",
+    "تماس با کارشناسان...",
+    "مقایسه با گونه‌های کمیاب...",
     "تحلیل میمیک صورت...",
-    "جستجو در دیتابیس حیوانات...",
+    "جستجو در دیتابیس...",
   ];
 
   // --- Standard Mode Functions ---
@@ -151,7 +153,7 @@ export const App: React.FC = () => {
     setLoadingProgress({
         currentStep: 0,
         totalSteps,
-        message: "در حال نوشتن سناریوی طنز...",
+        message: "در حال نوشتن سناریو...",
         timeLeftSeconds: totalSteps * 3
     });
 
@@ -166,11 +168,11 @@ export const App: React.FC = () => {
         for (let i = 0; i < story.pages.length; i++) {
             const page = story.pages[i];
             
-            // Generate Narration (Pass custom TTS style)
+            // Generate Narration (Pass custom TTS style and Voice Name)
             updateProgress(`ضبط صدای صفحه ${i + 1} از ${story.pages.length}...`);
             let audioBase64 = "";
             try {
-                audioBase64 = await generateRoastAudio(page.text, settings.ttsStylePrompt);
+                audioBase64 = await generateRoastAudio(page.text, settings.ttsStylePrompt, settings.voiceName);
             } catch (e) {
                 console.warn("Audio generation failed for page " + i);
             }
@@ -196,7 +198,7 @@ export const App: React.FC = () => {
 
   // To keep it clean, I'll pass a wrapper function to ResultCard.
   const playResultAudio = async (text: string): Promise<string> => {
-      return await generateRoastAudio(text, settings.ttsStylePrompt);
+      return await generateRoastAudio(text, settings.ttsStylePrompt, settings.voiceName);
   }
 
 

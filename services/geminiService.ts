@@ -121,7 +121,7 @@ export const analyzePartyGuest = async (base64Image: string, focusOn: string[], 
             },
             description: {
               type: Type.STRING,
-              description: "A funny explanation of why they look like this. If multiple people, mention them individually within the text.",
+              description: "A short, clear, and witty explanation connecting specific visual features (eyes, smile, hair, pose) to the animal. Use casual Persian.",
             },
             roastLevel: {
               type: Type.STRING,
@@ -144,7 +144,7 @@ export const analyzePartyGuest = async (base64Image: string, focusOn: string[], 
   }
 };
 
-export const generateRoastAudio = async (text: string, stylePrompt: string): Promise<string> => {
+export const generateRoastAudio = async (text: string, stylePrompt: string, voiceName: string = 'Kore'): Promise<string> => {
   // We include the text directly in the prompt to be read.
   const prompt = `
   ${stylePrompt}
@@ -161,7 +161,7 @@ export const generateRoastAudio = async (text: string, stylePrompt: string): Pro
         responseModalities: [Modality.AUDIO],
         speechConfig: {
           voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Kore' },
+            prebuiltVoiceConfig: { voiceName: voiceName },
           },
         },
       },
