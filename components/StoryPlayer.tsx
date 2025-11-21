@@ -1,6 +1,7 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { StoryResult } from '../types';
-import { X, RotateCcw, Play } from 'lucide-react';
+import { X, RotateCcw, Play, Video, Loader2, Pause, CheckCircle } from 'lucide-react';
 
 interface StoryPlayerProps {
   images: string[];
@@ -42,42 +43,160 @@ export const StoryPlayer: React.FC<StoryPlayerProps> = ({ images, story, onClose
   const [pageIndex, setPageIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingReady, setRecordingReady] = useState(false);
   
+  // Refs for stable access inside animation loop
+  const activePageIndexRef = useRef(0); 
+  
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const destinationNodeRef = useRef<MediaStreamAudioDestinationNode | null>(null); 
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  
   const isMountedRef = useRef(true);
   const playbackSessionRef = useRef(0);
+  const imageCacheRef = useRef<HTMLImageElement[]>([]);
+  
+  const animationFrameRef = useRef<number>(0);
 
-  // Initialize Audio Context
+  // Preload Images
   useEffect(() => {
-    const initAudio = () => {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      }
+    const loadImages = async () => {
+        const loadedImages: HTMLImageElement[] = [];
+        for (const src of images) {
+            await new Promise<void>((resolve) => {
+                const img = new Image();
+                img.onload = () => { loadedImages.push(img); resolve(); };
+                img.src = src;
+            });
+        }
+        imageCacheRef.current = loadedImages;
     };
-    initAudio();
+    loadImages();
+
+    if (!audioContextRef.current) {
+        const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        audioContextRef.current = ctx;
+        destinationNodeRef.current = ctx.createMediaStreamDestination();
+    }
+
     return () => {
       isMountedRef.current = false;
       stopAudio();
+      cancelAnimationFrame(animationFrameRef.current);
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close();
       }
     };
-  }, []);
+  }, [images]);
 
   const stopAudio = () => {
     if (sourceRef.current) {
-      try {
-        sourceRef.current.stop();
-      } catch (e) {
-        // ignore if already stopped
-      }
+      try { sourceRef.current.stop(); } catch (e) {}
       sourceRef.current = null;
     }
   };
 
-  const playSequence = async (startIndex: number) => {
-    // Start a new session to invalidate any previous running loops
+  // --- Rendering Logic ---
+  const drawFrame = (timestamp: number) => {
+      if (!canvasRef.current || imageCacheRef.current.length === 0) return;
+      
+      const ctx = canvasRef.current.getContext('2d');
+      if (!ctx) return;
+
+      // USE REF for index to ensure we always draw the CURRENT slide, not a stale closure value
+      const currentIndex = activePageIndexRef.current;
+      const currentPage = story.pages[currentIndex];
+      const imageIndex = currentPage ? currentPage.imageIndex : 0;
+      
+      // Fallback to index 0 if image not found
+      const img = imageCacheRef.current[imageIndex] || imageCacheRef.current[0];
+      if (!img) return;
+
+      // Much slower zoom effect
+      const zoomSpeed = 0.00005; 
+      // Use a unique seed based on index so each slide moves differently but consistently
+      const timeOffset = timestamp + (currentIndex * 10000);
+      const scale = 1.0 + (timeOffset * zoomSpeed) % 0.15; // Max zoom 1.15x
+
+      const canvasWidth = canvasRef.current.width;
+      const canvasHeight = canvasRef.current.height;
+
+      // Clear canvas completely
+      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      const iw = img.width;
+      const ih = img.height;
+      const ratio = Math.max(canvasWidth / iw, canvasHeight / ih);
+      
+      // Calculate centered position
+      const centerShift_x = (canvasWidth - iw * ratio) / 2;
+      const centerShift_y = (canvasHeight - ih * ratio) / 2;
+
+      ctx.save();
+      ctx.translate(canvasWidth / 2, canvasHeight / 2);
+      ctx.scale(scale, scale);
+      ctx.translate(-canvasWidth / 2, -canvasHeight / 2);
+      ctx.drawImage(img, 0, 0, iw, ih, centerShift_x, centerShift_y, iw * ratio, ih * ratio);
+      ctx.restore();
+
+      // Gradient Overlay
+      const gradient = ctx.createLinearGradient(0, canvasHeight * 0.5, 0, canvasHeight);
+      gradient.addColorStop(0, 'rgba(0,0,0,0)');
+      gradient.addColorStop(0.8, 'rgba(0,0,0,0.85)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      // Text Rendering
+      if (currentPage && currentPage.text) {
+          ctx.font = 'bold 26px Vazirmatn, sans-serif';
+          ctx.fillStyle = '#fff';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.shadowColor = "rgba(0,0,0,1)";
+          ctx.shadowBlur = 8;
+          ctx.shadowOffsetX = 2;
+          ctx.shadowOffsetY = 2;
+          
+          const words = currentPage.text.split(' ');
+          let line = '';
+          const lines = [];
+          const maxWidth = canvasWidth - 80;
+
+          for(let n = 0; n < words.length; n++) {
+            const testLine = line + words[n] + ' ';
+            const metrics = ctx.measureText(testLine);
+            const testWidth = metrics.width;
+            if (testWidth > maxWidth && n > 0) {
+                lines.push(line);
+                line = words[n] + ' ';
+            } else {
+                line = testLine;
+            }
+          }
+          lines.push(line);
+
+          let y = canvasHeight - 100;
+          for (let k = lines.length - 1; k >= 0; k--) {
+             ctx.fillText(lines[k], canvasWidth / 2, y);
+             y -= 40;
+          }
+          
+          ctx.font = '900 32px Vazirmatn, sans-serif';
+          ctx.fillStyle = '#FACC15';
+          ctx.fillText(story.title, canvasWidth / 2, y - 30);
+      }
+
+      animationFrameRef.current = requestAnimationFrame(drawFrame);
+  };
+
+  // --- Playback Logic ---
+  const playSequence = async (startIndex: number, recordMode: boolean = false) => {
     const sessionId = ++playbackSessionRef.current;
     
     if (!audioContextRef.current) return;
@@ -87,27 +206,69 @@ export const StoryPlayer: React.FC<StoryPlayerProps> = ({ images, story, onClose
 
     setIsPlaying(true);
     setIsFinished(false);
+    if (recordMode) setIsRecording(true);
 
+    // Start Animation
+    cancelAnimationFrame(animationFrameRef.current);
+    animationFrameRef.current = requestAnimationFrame(drawFrame);
+
+    // Setup Recorder
+    if (recordMode && canvasRef.current && destinationNodeRef.current) {
+        const canvasStream = canvasRef.current.captureStream(30);
+        const audioStream = destinationNodeRef.current.stream;
+        const combinedStream = new MediaStream([
+            ...canvasStream.getVideoTracks(),
+            ...audioStream.getAudioTracks()
+        ]);
+        
+        recordedChunksRef.current = [];
+        const recorder = new MediaRecorder(combinedStream, {
+            mimeType: 'video/webm;codecs=vp9,opus',
+            videoBitsPerSecond: 2500000 // 2.5 Mbps
+        });
+        
+        recorder.ondataavailable = (e) => {
+            if (e.data.size > 0) {
+                recordedChunksRef.current.push(e.data);
+            }
+        };
+        
+        recorder.onstop = () => {
+            setRecordingReady(true);
+            setIsRecording(false);
+        };
+        
+        mediaRecorderRef.current = recorder;
+        recorder.start();
+    }
+
+    // Iterate through pages
     for (let i = startIndex; i < story.pages.length; i++) {
-        // Check if this loop is still valid
-        if (sessionId !== playbackSessionRef.current || !isMountedRef.current) return;
+        if (sessionId !== playbackSessionRef.current || !isMountedRef.current) break;
 
+        // Sync state and ref
         setPageIndex(i);
+        activePageIndexRef.current = i;
+
         const page = story.pages[i];
         
-        // Play Narration
         if (page.audioBase64) {
             await playAudioBuffer(page.audioBase64, sessionId);
         } else {
-            // Fallback delay if no audio
+            // Fallback if no audio
             await new Promise(resolve => setTimeout(resolve, 4000));
         }
     }
 
-    // Only finish if this session is still the active one
+    // Cleanup when finished naturally
     if (sessionId === playbackSessionRef.current && isMountedRef.current) {
         setIsPlaying(false);
         setIsFinished(true);
+        
+        if (recordMode && mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+            mediaRecorderRef.current.stop();
+        }
+        cancelAnimationFrame(animationFrameRef.current);
     }
   };
 
@@ -117,59 +278,77 @@ export const StoryPlayer: React.FC<StoryPlayerProps> = ({ images, story, onClose
         const ctx = audioContextRef.current;
         if (!ctx) return resolve();
 
-        // Decode happens asynchronously
         const audioBytes = decode(base64);
         const buffer = await decodeAudioData(audioBytes, ctx, 24000, 1);
 
-        // Check again if session changed during decode
         if (sessionId !== playbackSessionRef.current) return resolve();
 
         const source = ctx.createBufferSource();
         source.buffer = buffer;
         source.connect(ctx.destination);
         
+        if (destinationNodeRef.current) {
+            source.connect(destinationNodeRef.current);
+        }
+        
         source.onended = () => {
-          if (sessionId === playbackSessionRef.current) {
-             sourceRef.current = null;
-             resolve();
-          }
+           // Only resolve if we are still in the same session
+           if (sessionId === playbackSessionRef.current) {
+               sourceRef.current = null;
+               resolve();
+           }
         };
         
         sourceRef.current = source;
         source.start();
       } catch (e) {
-        console.error("Audio decode error", e);
-        resolve(); // Continue sequence even if audio fails
+        console.error("Audio error", e);
+        resolve();
       }
     });
   };
 
-  // Start automatically on mount
+  const handleStartRecording = () => {
+      stopAudio();
+      setRecordingReady(false);
+      playSequence(0, true);
+  };
+
+  const handleDownloadVideo = () => {
+      if (recordedChunksRef.current.length === 0) return;
+      const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `ravayatgar-story-${Date.now()}.webm`;
+      a.click();
+      URL.revokeObjectURL(url);
+  };
+
+  // Auto-start preview
   useEffect(() => {
-    playSequence(0);
+    playSequence(0, false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleRestart = () => {
-    stopAudio();
-    setPageIndex(0);
-    playSequence(0);
-  };
-
-  // Navigation Handlers
   const handleNext = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isRecording) return; 
     stopAudio();
-    if (pageIndex < story.pages.length - 1) {
-        playSequence(pageIndex + 1);
+    const nextIndex = pageIndex + 1;
+    if (nextIndex < story.pages.length) {
+        playSequence(nextIndex);
     } else {
+        // Just stop if at end
         setIsPlaying(false);
         setIsFinished(true);
+        cancelAnimationFrame(animationFrameRef.current);
     }
   };
 
   const handlePrev = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isRecording) return;
     stopAudio();
     if (pageIndex > 0) {
         playSequence(pageIndex - 1);
@@ -178,79 +357,87 @@ export const StoryPlayer: React.FC<StoryPlayerProps> = ({ images, story, onClose
     }
   };
 
-  const currentPage = story.pages[pageIndex];
-  const currentImage = currentPage ? images[currentPage.imageIndex] : images[0];
-
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col animate-fade-in font-vazir select-none">
       
-      {/* Navigation Overlays (Instagram style) */}
+      <div className="relative flex-1 w-full overflow-hidden bg-black flex items-center justify-center">
+          <canvas 
+            ref={canvasRef} 
+            width={720} 
+            height={1280} 
+            className="h-full w-full object-contain"
+          />
+      </div>
+
       <div className="absolute inset-0 z-10 flex">
          <div className="w-1/3 h-full" onClick={handlePrev}></div>
-         <div className="w-1/3 h-full" onClick={() => { /* Optional pause toggle could go here */ }}></div>
+         <div className="w-1/3 h-full"></div>
          <div className="w-1/3 h-full" onClick={handleNext}></div>
       </div>
 
-      {/* Progress Bar */}
       <div className="absolute top-0 left-0 right-0 flex gap-1 p-2 z-30">
         {story.pages.map((_, idx) => (
             <div key={idx} className={`h-1 flex-1 rounded-full transition-all duration-300 ${idx <= pageIndex ? 'bg-white' : 'bg-white/30'}`}></div>
         ))}
       </div>
 
-      {/* Close Button */}
       <button onClick={onClose} className="absolute top-4 right-4 z-40 p-2 bg-black/40 text-white rounded-full backdrop-blur-md hover:bg-black/60 transition">
         <X className="w-6 h-6" />
       </button>
 
-      {/* Image Display */}
-      <div className="relative flex-1 w-full overflow-hidden">
-        {currentImage && (
-            <img 
-                src={currentImage} 
-                className={`w-full h-full object-cover transition-transform duration-[10000ms] ease-linear ${isPlaying ? 'scale-110' : 'scale-100'}`} 
-                alt="Story Scene" 
-            />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent pointer-events-none"></div>
-      </div>
+      {isRecording && (
+          <div className="absolute top-16 right-4 z-40 flex items-center gap-2 bg-red-600 text-white px-3 py-1 rounded-full animate-pulse shadow-lg">
+              <div className="w-3 h-3 bg-white rounded-full"></div>
+              <span className="text-xs font-bold">در حال ضبط...</span>
+          </div>
+      )}
 
-      {/* Text & Controls */}
-      <div className="absolute bottom-0 left-0 right-0 p-6 pb-10 bg-gradient-to-t from-black to-transparent z-20 pointer-events-none">
-        <h2 className="text-2xl font-black text-yellow-400 mb-2 drop-shadow-lg">{story.title}</h2>
-        
-        <div className="bg-white/10 backdrop-blur-md border border-white/10 p-4 rounded-2xl min-h-[120px] flex flex-col justify-center shadow-xl">
-            <p className="text-lg text-white leading-relaxed text-right font-medium" dir="rtl">
-                {currentPage?.text}
-            </p>
-        </div>
-
-        <div className="flex justify-center mt-6 h-12 pointer-events-auto">
-            {isPlaying ? (
-                 <div className="flex items-center gap-3 px-4 py-2 bg-black/40 backdrop-blur-sm rounded-full border border-white/10">
-                     <div className="flex gap-1 items-end h-4">
-                        <span className="w-1 h-2 bg-purple-400 animate-[bounce_1s_infinite]"></span>
-                        <span className="w-1 h-4 bg-pink-400 animate-[bounce_1.2s_infinite]"></span>
-                        <span className="w-1 h-3 bg-purple-400 animate-[bounce_0.8s_infinite]"></span>
-                     </div>
-                     <span className="text-sm text-gray-300 font-bold">درحال روایت...</span>
-                 </div>
-            ) : isFinished ? (
-                 <button 
-                    onClick={handleRestart}
-                    className="flex items-center gap-2 bg-white text-black px-6 py-2 rounded-full font-bold hover:bg-gray-200 transition-transform hover:scale-105 shadow-lg"
+      <div className="absolute bottom-0 left-0 right-0 p-6 pb-10 bg-gradient-to-t from-black via-black/80 to-transparent z-20 pointer-events-none flex flex-col items-center">
+        <div className="flex justify-center mt-4 h-12 pointer-events-auto gap-3">
+            {recordingReady ? (
+                <button 
+                    onClick={handleDownloadVideo}
+                    className="flex items-center gap-2 bg-green-600 text-white px-6 py-2 rounded-full font-bold hover:bg-green-500 transition-transform hover:scale-105 shadow-lg animate-bounce"
                 >
-                    <RotateCcw size={18} />
-                    تماشای مجدد
+                    <CheckCircle size={18} />
+                    دانلود ویدیو
+                </button>
+            ) : isRecording ? (
+                <button className="flex items-center gap-2 bg-gray-700 text-gray-300 px-6 py-2 rounded-full font-bold cursor-default border border-gray-600">
+                    <Loader2 size={18} className="animate-spin" />
+                    صبر کنید...
                 </button>
             ) : (
-                <button 
-                    onClick={() => playSequence(pageIndex)}
-                    className="flex items-center gap-2 bg-purple-600 text-white px-6 py-2 rounded-full font-bold hover:bg-purple-500"
-                >
-                    <Play size={18} />
-                    ادامه
-                </button>
+                <>
+                    {isFinished ? (
+                        <div className="flex gap-3">
+                             <button 
+                                onClick={() => playSequence(0, false)}
+                                className="flex items-center gap-2 bg-white text-black px-5 py-2.5 rounded-full font-bold hover:bg-gray-200 transition"
+                            >
+                                <RotateCcw size={18} />
+                                تماشا
+                            </button>
+                            <button 
+                                onClick={handleStartRecording}
+                                className="flex items-center gap-2 bg-red-600 text-white px-5 py-2.5 rounded-full font-bold hover:bg-red-500 transition shadow-lg shadow-red-900/30"
+                            >
+                                <Video size={18} />
+                                ضبط و ذخیره
+                            </button>
+                        </div>
+                    ) : (
+                        isPlaying ? (
+                             <button onClick={() => { stopAudio(); setIsPlaying(false); cancelAnimationFrame(animationFrameRef.current); }} className="p-4 rounded-full bg-white/20 backdrop-blur text-white border border-white/10 hover:bg-white/30 transition">
+                                 <Pause size={24} />
+                             </button>
+                        ) : (
+                             <button onClick={() => playSequence(pageIndex, false)} className="p-4 rounded-full bg-white text-black hover:scale-105 transition shadow-[0_0_20px_rgba(255,255,255,0.3)]">
+                                 <Play size={24} fill="currentColor" />
+                             </button>
+                        )
+                    )}
+                </>
             )}
         </div>
       </div>

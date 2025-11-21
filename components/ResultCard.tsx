@@ -1,7 +1,7 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { AnalysisResult } from '../types';
-import { Share2, RotateCcw, Volume2, Loader2, StopCircle } from 'lucide-react';
+import { Share2, RotateCcw, Volume2, Loader2, StopCircle, Download, Music, Video } from 'lucide-react';
 
 interface ResultCardProps {
   result: AnalysisResult;
@@ -43,14 +43,43 @@ async function decodeAudioData(
 export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onReset, customAudioGenerator }) => {
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [audioBase64Cache, setAudioBase64Cache] = useState<string | null>(null);
+  const [isSavingImage, setIsSavingImage] = useState(false);
+  const [isGeneratingVideo, setIsGeneratingVideo] = useState(false);
+
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const videoCanvasRef = useRef<HTMLCanvasElement>(null);
+  const destinationNodeRef = useRef<MediaStreamAudioDestinationNode | null>(null);
 
   // Adjust font size if multiple emojis (group result)
   const emojiFontSize = result.emoji && [...result.emoji].length > 2 ? 'text-4xl' : 'text-6xl';
 
+  useEffect(() => {
+      // Init Audio Context for recording
+      return () => {
+          if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+              audioContextRef.current.close();
+          }
+      };
+  }, []);
+
+  const generateAudio = async () => {
+     if (audioBase64Cache) return audioBase64Cache;
+     
+     setIsLoadingAudio(true);
+     try {
+        const textToRead = `${result.characterTitle}\n\n${result.description}`;
+        const base64 = await customAudioGenerator(textToRead);
+        setAudioBase64Cache(base64);
+        return base64;
+     } finally {
+        setIsLoadingAudio(false);
+     }
+  };
+
   const handlePlayAudio = async () => {
-    // If already playing, stop it
     if (isPlaying) {
       if (sourceNodeRef.current) {
         sourceNodeRef.current.stop();
@@ -60,10 +89,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
       return;
     }
 
-    setIsLoadingAudio(true);
-
     try {
-      // Initialize Audio Context on user gesture
       if (!audioContextRef.current) {
         audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       }
@@ -72,18 +98,13 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
         await audioContextRef.current.resume();
       }
 
-      // Only pass the content without labels so the model doesn't read "TITLE" or "DESCRIPTION"
-      const textToRead = `${result.characterTitle}\n\n${result.description}`;
-
-      // Fetch Audio using the custom generator (which injects the settings)
-      const base64Audio = await customAudioGenerator(textToRead);
+      const base64Audio = await generateAudio();
       
-      // Decode and Play
       const audioBytes = decode(base64Audio);
       const audioBuffer = await decodeAudioData(
         audioBytes,
         audioContextRef.current,
-        24000, // Gemini TTS uses 24k sample rate
+        24000,
         1
       );
 
@@ -103,14 +124,220 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
     } catch (error) {
       console.error("Error playing audio:", error);
       alert("خطا در پخش صدا");
-    } finally {
-      setIsLoadingAudio(false);
     }
   };
 
+  const handleDownloadAudio = async () => {
+      try {
+          const base64 = await generateAudio();
+          const link = document.createElement('a');
+          link.href = `data:audio/wav;base64,${base64}`;
+          link.download = `ravayatgar-${Date.now()}.wav`;
+          link.click();
+      } catch (e) {
+          alert('خطا در دانلود صدا');
+      }
+  };
+
+  const handleSaveImage = async () => {
+      if (!cardRef.current || isSavingImage) return;
+      setIsSavingImage(true);
+
+      try {
+          const html2canvas = (window as any).html2canvas;
+          if (!html2canvas) {
+              alert("کتابخانه ذخیره عکس لود نشد");
+              return;
+          }
+
+          const canvas = await html2canvas(cardRef.current, {
+              backgroundColor: '#111827',
+              scale: 2,
+              useCORS: true,
+          });
+
+          const link = document.createElement('a');
+          link.download = `ravayatgar-card-${Date.now()}.png`;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+      } catch (e) {
+          console.error(e);
+          alert('خطا در ذخیره عکس');
+      } finally {
+          setIsSavingImage(false);
+      }
+  };
+
+  const handleDownloadVideo = async () => {
+      if (isGeneratingVideo) return;
+      setIsGeneratingVideo(true);
+
+      // Stop current playback if any
+      if (sourceNodeRef.current) {
+        sourceNodeRef.current.stop();
+        setIsPlaying(false);
+      }
+
+      try {
+        // 1. Prepare Audio Context
+        if (!audioContextRef.current) {
+            audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+        }
+        if (audioContextRef.current.state === 'suspended') await audioContextRef.current.resume();
+
+        if (!destinationNodeRef.current) {
+            destinationNodeRef.current = audioContextRef.current.createMediaStreamDestination();
+        }
+
+        // 2. Prepare Image
+        const img = new Image();
+        img.src = imageSrc;
+        await new Promise((resolve) => { img.onload = resolve; });
+
+        // 3. Get Audio Buffer
+        const base64Audio = await generateAudio();
+        const audioBytes = decode(base64Audio);
+        const audioBuffer = await decodeAudioData(audioBytes, audioContextRef.current, 24000, 1);
+
+        // 4. Setup Recording Canvas
+        const canvas = videoCanvasRef.current!;
+        canvas.width = 720;
+        canvas.height = 1280;
+        const ctx = canvas.getContext('2d')!;
+
+        // 5. Setup MediaRecorder
+        const canvasStream = canvas.captureStream(30);
+        const audioStream = destinationNodeRef.current.stream;
+        const combinedStream = new MediaStream([...canvasStream.getVideoTracks(), ...audioStream.getAudioTracks()]);
+        
+        const chunks: Blob[] = [];
+        const recorder = new MediaRecorder(combinedStream, {
+             mimeType: 'video/webm;codecs=vp9,opus',
+             videoBitsPerSecond: 2500000
+        });
+        
+        recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+        
+        // 6. Animation Loop (Ken Burns + Text)
+        const startTime = performance.now();
+        let animationId: number;
+
+        const drawFrame = () => {
+            const elapsed = performance.now() - startTime;
+            const scale = 1.0 + (elapsed * 0.00005); // Slow Zoom
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Image
+            const iw = img.width;
+            const ih = img.height;
+            const ratio = Math.max(canvas.width / iw, canvas.height / ih);
+            const cx = (canvas.width - iw * ratio) / 2;
+            const cy = (canvas.height - ih * ratio) / 2;
+
+            ctx.save();
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.scale(scale, scale);
+            ctx.translate(-canvas.width / 2, -canvas.height / 2);
+            ctx.drawImage(img, 0, 0, iw, ih, cx, cy, iw * ratio, ih * ratio);
+            ctx.restore();
+
+            // Draw Text Overlay
+            const gradient = ctx.createLinearGradient(0, canvas.height * 0.5, 0, canvas.height);
+            gradient.addColorStop(0, 'rgba(0,0,0,0)');
+            gradient.addColorStop(0.8, 'rgba(0,0,0,0.9)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Render text logic
+            ctx.font = 'bold 30px Vazirmatn, sans-serif';
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.shadowColor = "rgba(0,0,0,0.9)";
+            ctx.shadowBlur = 6;
+
+            const words = result.description.split(' ');
+            let line = '';
+            const lines = [];
+            const maxWidth = canvas.width - 80;
+
+            for(let n = 0; n < words.length; n++) {
+                const testLine = line + words[n] + ' ';
+                const metrics = ctx.measureText(testLine);
+                if (metrics.width > maxWidth && n > 0) {
+                    lines.push(line);
+                    line = words[n] + ' ';
+                } else {
+                    line = testLine;
+                }
+            }
+            lines.push(line);
+
+            let y = canvas.height - 100;
+            for (let k = lines.length - 1; k >= 0; k--) {
+                ctx.fillText(lines[k], canvas.width / 2, y);
+                y -= 45;
+            }
+            
+            ctx.font = '900 40px Vazirmatn, sans-serif';
+            ctx.fillStyle = '#FACC15'; // Title Color
+            ctx.fillText(result.characterTitle, canvas.width / 2, y - 20);
+
+            animationId = requestAnimationFrame(drawFrame);
+        };
+
+        // 7. Start Playback & Recording
+        const source = audioContextRef.current.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(destinationNodeRef.current); // To recorder
+        
+        // Optional: connect to speakers if you want to hear it while recording (muted for performance usually)
+        // source.connect(audioContextRef.current.destination); 
+
+        recorder.start();
+        source.start();
+        drawFrame();
+
+        await new Promise<void>((resolve) => {
+            source.onended = () => {
+                recorder.stop();
+                cancelAnimationFrame(animationId);
+                resolve();
+            };
+        });
+
+        // 8. Download
+        await new Promise<void>(resolve => {
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `ravayatgar-video-${Date.now()}.webm`;
+                a.click();
+                URL.revokeObjectURL(url);
+                resolve();
+            };
+        });
+
+      } catch (e) {
+          console.error(e);
+          alert("خطا در تولید ویدیو");
+      } finally {
+          setIsGeneratingVideo(false);
+      }
+  };
+
   return (
-    <div className="flex flex-col items-center w-full max-w-md mx-auto animate-fade-in">
-      <div className="relative w-full bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border border-purple-500/30">
+    <div className="flex flex-col items-center w-full max-w-md mx-auto animate-fade-in pb-20">
+      {/* Hidden Canvas for Video Gen */}
+      <canvas ref={videoCanvasRef} className="hidden" />
+
+      {/* The Capture Area */}
+      <div ref={cardRef} className="relative w-full bg-gray-900 rounded-3xl overflow-hidden shadow-2xl border border-purple-500/30">
         
         {/* Image Section */}
         <div className="relative h-72 w-full">
@@ -147,6 +374,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
                 <div className="flex justify-center mt-4 border-t border-white/10 pt-3">
                    <button 
                      onClick={handlePlayAudio}
+                     disabled={isGeneratingVideo}
                      className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all ${
                         isPlaying 
                         ? "bg-red-500/20 text-red-400 border border-red-500/50"
@@ -156,50 +384,64 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
                      {isLoadingAudio ? (
                         <>
                             <Loader2 size={16} className="animate-spin" />
-                            <span>در حال ساخت روایت...</span>
+                            <span>در حال ساخت...</span>
                         </>
                      ) : isPlaying ? (
                         <>
                             <StopCircle size={16} />
-                            <span>توقف روایت</span>
+                            <span>توقف صدا</span>
                         </>
                      ) : (
                         <>
                             <Volume2 size={16} />
-                            <span>پخش روایت صوتی</span>
+                            <span>پخش صدا</span>
                         </>
                      )}
                    </button>
                 </div>
             </div>
-
-            {/* Action Buttons */}
-            <div className="grid grid-cols-2 gap-4 pt-4">
-                <button 
-                    onClick={onReset}
-                    className="flex items-center justify-center gap-2 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-bold transition border border-gray-700"
-                >
-                    <RotateCcw size={20} />
-                    دوباره
-                </button>
-                <button 
-                    onClick={() => {
-                        if (navigator.share) {
-                            navigator.share({
-                                title: 'روایتگر',
-                                text: `نقش من: ${result.characterTitle}! ${result.description}`,
-                            }).catch(console.error);
-                        } else {
-                            alert('اشتراک‌گذاری در این مرورگر پشتیبانی نمی‌شود');
-                        }
-                    }}
-                    className="flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold transition shadow-lg shadow-purple-900/50"
-                >
-                    <Share2 size={20} />
-                    اشتراک
-                </button>
+            
+            <div className="text-gray-600 text-xs font-mono opacity-50 pt-2">
+                AI Party Scanner • Ravayatgar
             </div>
         </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="w-full grid grid-cols-2 gap-3 mt-6">
+            <button 
+                onClick={onReset}
+                className="flex items-center justify-center gap-2 py-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-white font-bold transition border border-gray-700"
+            >
+                <RotateCcw size={18} />
+                دوباره
+            </button>
+            
+            <button 
+                onClick={handleSaveImage}
+                disabled={isSavingImage}
+                className="flex items-center justify-center gap-2 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold transition shadow-lg shadow-blue-900/30"
+            >
+                {isSavingImage ? <Loader2 className="animate-spin" size={18}/> : <Download size={18} />}
+                عکس
+            </button>
+
+            <button 
+                onClick={handleDownloadAudio}
+                className="flex items-center justify-center gap-2 py-3 rounded-xl bg-green-600 hover:bg-green-500 text-white font-bold transition shadow-lg shadow-green-900/30"
+            >
+                <Music size={18} />
+                صدا
+            </button>
+
+            <button 
+                onClick={handleDownloadVideo}
+                disabled={isGeneratingVideo}
+                className="flex items-center justify-center gap-2 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold transition shadow-lg shadow-red-900/30"
+            >
+                {isGeneratingVideo ? <Loader2 className="animate-spin" size={18} /> : <Video size={18} />}
+                ویدیو
+            </button>
       </div>
     </div>
   );
