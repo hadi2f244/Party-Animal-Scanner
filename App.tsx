@@ -6,7 +6,7 @@ import { CameraView } from './components/CameraView';
 import { ResultCard } from './components/ResultCard';
 import { StoryPlayer } from './components/StoryPlayer';
 import { SettingsView } from './components/SettingsView';
-import { AnalysisResult, AppState, PersonDetected, StoryResult, LoadingProgress, AppSettings, DEFAULT_SETTINGS } from './types';
+import { AnalysisResult, AppState, PersonDetected, StoryResult, LoadingProgress, AppSettings, DEFAULT_SETTINGS, GameTheme, GAME_THEMES } from './types';
 
 export const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.HOME);
@@ -25,25 +25,54 @@ export const App: React.FC = () => {
 
   // Settings State
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [customThemes, setCustomThemes] = useState<GameTheme[]>([]);
 
-  // Load settings from local storage on mount
+  // Load settings and themes from local storage on mount
   useEffect(() => {
-    const savedSettings = localStorage.getItem('partyApp_settings_v6');
+    // Load Settings
+    const savedSettings = localStorage.getItem('partyApp_settings_v7');
     if (savedSettings) {
         try {
             const parsed = JSON.parse(savedSettings);
-            // Merge with default to ensure new fields (like voiceName) exist if migrating from old version
             setSettings({ ...DEFAULT_SETTINGS, ...parsed });
         } catch (e) {
             console.error("Failed to parse settings", e);
+        }
+    }
+
+    // Load Custom Themes
+    const savedThemes = localStorage.getItem('partyApp_custom_themes');
+    if (savedThemes) {
+        try {
+            const parsedThemes = JSON.parse(savedThemes);
+            setCustomThemes(parsedThemes);
+        } catch (e) {
+            console.error("Failed to parse custom themes", e);
         }
     }
   }, []);
 
   const saveSettings = (newSettings: AppSettings) => {
       setSettings(newSettings);
-      localStorage.setItem('partyApp_settings_v6', JSON.stringify(newSettings));
+      localStorage.setItem('partyApp_settings_v7', JSON.stringify(newSettings));
       setAppState(AppState.HOME);
+  };
+
+  const handleAddTheme = (newTheme: GameTheme) => {
+    const updatedThemes = [...customThemes, newTheme];
+    setCustomThemes(updatedThemes);
+    localStorage.setItem('partyApp_custom_themes', JSON.stringify(updatedThemes));
+  };
+
+  const handleDeleteTheme = (themeId: string) => {
+    const updatedThemes = customThemes.filter(t => t.id !== themeId);
+    setCustomThemes(updatedThemes);
+    localStorage.setItem('partyApp_custom_themes', JSON.stringify(updatedThemes));
+    
+    // If deleted theme was selected, revert to default
+    if (settings.selectedThemeId === themeId) {
+        setSettings(DEFAULT_SETTINGS);
+    }
   };
 
   const funnyLoadingMessages = [
@@ -52,6 +81,8 @@ export const App: React.FC = () => {
     "بررسی سوابق تاریخی...",
     "تحلیل شخصیت...",
     "نوشتن سناریو...",
+    "تماس با نویسندگان هالیوود...",
+    "تنظیم نور صحنه...",
   ];
 
   // --- Standard Mode Functions ---
@@ -132,13 +163,11 @@ export const App: React.FC = () => {
     setStoryImages(images);
     setAppState(AppState.STORY_LOADING);
     
-    // Estimated steps: 1 (Text Gen) + Images (Voice)
     const totalSteps = 1 + images.length;
     let currentStep = 0;
 
     const updateProgress = (msg: string) => {
         currentStep++;
-        // Rough estimate: Text=4s, Audio=3s per clip
         const remainingSteps = totalSteps - currentStep;
         const estimatedTime = remainingSteps * 3; 
         
@@ -158,17 +187,14 @@ export const App: React.FC = () => {
     });
 
     try {
-        // 1. Generate Text Story (Pass custom prompt)
         const story = await generatePartyStory(images, settings.storyPrompt);
         updateProgress("سناریو نوشته شد! در حال ضبط صدا...");
 
-        // 2. Pre-load Audio for each page
         const pagesWithAudio = [];
         
         for (let i = 0; i < story.pages.length; i++) {
             const page = story.pages[i];
             
-            // Generate Narration (Pass custom TTS style and Voice Name)
             updateProgress(`ضبط صدای صفحه ${i + 1} از ${story.pages.length}...`);
             let audioBase64 = "";
             try {
@@ -194,15 +220,11 @@ export const App: React.FC = () => {
     }
   };
 
-  // --- Result Actions ---
+  // --- Shared Functions ---
 
-  // To keep it clean, I'll pass a wrapper function to ResultCard.
   const playResultAudio = async (text: string): Promise<string> => {
       return await generateRoastAudio(text, settings.ttsStylePrompt, settings.voiceName);
   }
-
-
-  // --- Shared Functions ---
 
   const resizeImage = (file: File): Promise<string> => {
     return new Promise((resolve) => {
@@ -211,7 +233,7 @@ export const App: React.FC = () => {
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_SIZE = 800; // Reduced from 1024 to 800 to prevent errors
+          const MAX_SIZE = 800;
           let w = img.width;
           let h = img.height;
           
@@ -232,7 +254,7 @@ export const App: React.FC = () => {
           const ctx = canvas.getContext('2d');
           if (ctx) {
               ctx.drawImage(img, 0, 0, w, h);
-              resolve(canvas.toDataURL('image/jpeg', 0.6)); // Quality 0.6
+              resolve(canvas.toDataURL('image/jpeg', 0.6));
           }
         };
         img.src = e.target?.result as string;
@@ -263,13 +285,15 @@ export const App: React.FC = () => {
     setLoadingProgress(null);
   };
 
+  // Combine default and custom themes
+  const allThemes = [...GAME_THEMES, ...customThemes];
+
   return (
     <div className="min-h-screen bg-gray-950 text-white flex flex-col items-center py-8 px-4 relative overflow-hidden font-vazir">
       {/* Background Ambient Effects */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-700/30 rounded-full blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-pink-700/20 rounded-full blur-[120px] pointer-events-none"></div>
 
-      {/* Hidden File Input */}
       <input 
         type="file" 
         id="file-upload"
@@ -280,7 +304,6 @@ export const App: React.FC = () => {
 
       {appState === AppState.HOME && (
         <div className="w-full max-w-md flex flex-col items-center justify-center min-h-[80vh] space-y-8 animate-fade-in relative">
-            {/* Settings Button */}
             <button 
                 onClick={() => setAppState(AppState.SETTINGS)}
                 className="absolute top-0 right-0 p-3 bg-white/10 hover:bg-white/20 rounded-full text-gray-300 hover:text-white transition backdrop-blur-sm z-10"
@@ -298,6 +321,15 @@ export const App: React.FC = () => {
                 <p className="text-gray-400 text-lg">
                     داستان‌سرای هوشمند برای مهمونی‌ها
                 </p>
+                
+                {/* Current Theme Badge */}
+                <div className="inline-flex items-center gap-2 bg-gray-800/60 px-4 py-1 rounded-full text-sm text-gray-300 border border-gray-700">
+                    <span>ژانر فعلی:</span>
+                    <span className="text-white font-bold">
+                        {allThemes.find(t => t.id === settings.selectedThemeId)?.label || 'شخصی'}
+                    </span>
+                    <span>{allThemes.find(t => t.id === settings.selectedThemeId)?.emoji}</span>
+                </div>
             </div>
 
             <div className="w-full space-y-4">
@@ -341,8 +373,11 @@ export const App: React.FC = () => {
       {appState === AppState.SETTINGS && (
         <SettingsView 
             currentSettings={settings} 
+            availableThemes={allThemes}
             onSave={saveSettings} 
             onClose={() => setAppState(AppState.HOME)} 
+            onAddTheme={handleAddTheme}
+            onDeleteTheme={handleDeleteTheme}
         />
       )}
 
@@ -355,7 +390,7 @@ export const App: React.FC = () => {
 
       {appState === AppState.STORY_CAPTURE && (
         <CameraView 
-            onCapture={() => {}} // Not used in multi-mode directly
+            onCapture={() => {}} 
             onClose={() => setAppState(AppState.HOME)}
             multiMode={true}
             onMultiCaptureFinish={handleStoryCaptureFinish}
@@ -458,7 +493,6 @@ export const App: React.FC = () => {
                     </div>
                 </div>
                 
-                {/* Thumbnails */}
                 <div className="flex gap-2 mb-8 overflow-hidden justify-center">
                     {storyImages.slice(0, 4).map((img, i) => (
                         <img key={i} src={img} className="w-12 h-12 rounded-lg object-cover border border-white/20 opacity-60" />
@@ -466,7 +500,6 @@ export const App: React.FC = () => {
                     {storyImages.length > 4 && <div className="w-12 h-12 rounded-lg bg-gray-700 flex items-center justify-center text-xs">+{storyImages.length - 4}</div>}
                 </div>
 
-                {/* Progress Bar */}
                 <div className="relative w-full h-3 bg-gray-700 rounded-full overflow-hidden mb-4">
                     <div 
                         className="absolute top-0 left-0 h-full bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-500 transition-all duration-500 ease-out"

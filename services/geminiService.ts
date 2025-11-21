@@ -11,7 +11,7 @@ const retry = async <T>(fn: () => Promise<T>, retries = 2): Promise<T> => {
   } catch (e) {
     if (retries > 0) {
       console.warn(`API Call Failed. Retrying... Attempts left: ${retries}`, e);
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise(r => setTimeout(r, 1500)); // Increased wait time slightly
       return retry(fn, retries - 1);
     }
     throw e;
@@ -79,27 +79,23 @@ export const analyzeCharacter = async (base64Image: string, focusOn: string[], c
   // Clean the base64 string if it has the header
   const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
 
-  // Use the custom prompt as the base instructions
+  // Use the custom prompt from settings (which is now in Persian)
   let prompt = `${customPrompt}`;
   
   if (focusOn.length > 0) {
     prompt += `
     
-    IMPORTANT INSTRUCTION:
-    FOCUS ONLY on these specific people described here: ${focusOn.join(", ")}.
-    Ignore anyone else in the background.
-    
-    Since there are multiple selected people (or a specific subset):
-    Assign a collective Title and Description for the group based on the persona/theme.`;
+    تذکر مهم: فقط روی این افراد تمرکز کن: ${focusOn.join(", ")}.
+    بقیه افراد در پس‌زمینه را نادیده بگیر.
+    اگر چند نفر انتخاب شده‌اند، یک عنوان و توصیف گروهی برایشان بساز.`;
   } else {
     prompt += `
     
-    IMPORTANT INSTRUCTION:
-    Analyze the main subject(s) in the frame.`;
+    سوژه اصلی (یا سوژه‌های اصلی) عکس را تحلیل کن.`;
   }
 
   prompt += `
-    Return the result in this strict JSON structure:`;
+    خروجی را دقیقاً با فرمت JSON زیر برگردان:`;
 
   try {
     const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
@@ -122,19 +118,19 @@ export const analyzeCharacter = async (base64Image: string, focusOn: string[], c
           properties: {
             characterTitle: {
               type: Type.STRING,
-              description: "The name of the character, animal, or role assigned to the person (in Persian)",
+              description: "عنوان نقش یا شخصیت (به فارسی)",
             },
             emoji: {
               type: Type.STRING,
-              description: "One or more emojis representing the character",
+              description: "یک یا چند ایموجی مرتبط",
             },
             description: {
               type: Type.STRING,
-              description: "A short, creative explanation connecting visual features to the character role. Use casual Persian.",
+              description: "توضیح خلاقانه که ویژگی‌های ظاهری و محیط عکس را به نقش ربط می‌دهد (به فارسی)",
             },
             subtitle: {
               type: Type.STRING,
-              description: "A short label, status, power level, or roast level in Persian",
+              description: "یک زیرنویس کوتاه، لقب یا وضعیت (به فارسی)",
             }
           },
           required: ["characterTitle", "emoji", "description", "subtitle"],
@@ -154,11 +150,11 @@ export const analyzeCharacter = async (base64Image: string, focusOn: string[], c
 };
 
 export const generateRoastAudio = async (text: string, stylePrompt: string, voiceName: string = 'Kore'): Promise<string> => {
-  // We include the text directly in the prompt to be read.
+  // Include the style instructions for the reader
   const prompt = `
   ${stylePrompt}
   
-  Here is the text to read:
+  متن زیر را بخوان:
   "${text}"
   `;
 
@@ -187,7 +183,6 @@ export const generateRoastAudio = async (text: string, stylePrompt: string, voic
 };
 
 export const generatePartyStory = async (base64Images: string[], customPrompt: string): Promise<StoryResult> => {
-  // Prepare parts: images + prompt
   const parts: any[] = [];
   
   base64Images.forEach(img => {
@@ -203,19 +198,20 @@ export const generatePartyStory = async (base64Images: string[], customPrompt: s
   const prompt = `
     ${customPrompt}
 
-    I have provided ${base64Images.length} photos in order.
+    من ${base64Images.length} عکس به ترتیب به تو داده‌ام.
     
-    Rules:
-    1. Create a Title for the story.
-    2. For EACH photo, visually identify the Character/Role based on the theme.
-    3. Write a paragraph of the story (in Persian) centered around this character.
-    4. The story must flow logically from photo 1 to photo 2.
+    قوانین:
+    1. یک عنوان (Title) جذاب برای داستان بساز.
+    2. برای هر عکس، شخصیت‌ها و نقششان را در داستان مشخص کن.
+    3. یک پاراگراف داستان (به فارسی) برای هر عکس بنویس.
+    4. داستان باید از عکس 1 به عکس 2 و ... به صورت پیوسته جریان داشته باشد.
+    5. حیاتی: حتماً محیط و پس‌زمینه هر عکس را در داستان توصیف کن (مثلاً "در آشپزخانه تاریک..." یا "روی مبل راحتی...").
     
-    Return JSON:
+    خروجی JSON:
     {
-      "title": "Story Title",
+      "title": "عنوان داستان",
       "pages": [
-        { "imageIndex": 0, "text": "Story part for first photo..." },
+        { "imageIndex": 0, "text": "متن داستان برای عکس اول..." },
         ...
       ]
     }
