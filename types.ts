@@ -82,7 +82,7 @@ export const GAME_THEMES: GameTheme[] = [
     - Theme: Spilling the tea, arguing about the Mehr (dowry), the groom sweating profusely.
     - Tone: Gossip, judgmental, hilarious Iranian family drama.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'با لحن پیرزن‌های فضول و غرغرو، پر از کنایه و ایش و ویش.'
+    ttsStylePrompt: 'با لحن بسیار جدی، خشک و قضاوت‌گر. مثل مادری که اصلا از وضعیت راضی نیست و دارد با جدیت ایراد می‌گیرد. اصلا نخند.'
   },
   {
     id: 'looti',
@@ -103,7 +103,7 @@ export const GAME_THEMES: GameTheme[] = [
     - Theme: Trying to start a fight but slipping on a melon skin.
     - Tone: Deep voice, exaggerated slang, street humor.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'با صدای کلفت، لاتی، کش‌دار و پر از اصطلاحات چاله میدانی.'
+    ttsStylePrompt: 'با صدای بسیار کلفت، بم و کاملا جدی. مثل شخصیت‌های فیلم‌های کیمیایی که شوخی سرشان نمی‌شود.'
   },
   {
     id: 'shomal',
@@ -124,7 +124,7 @@ export const GAME_THEMES: GameTheme[] = [
     - Theme: Stuck in traffic, rain ruins the Kebab, expensive villa.
     - Tone: Energetic, complaining about prices, funny observational humor.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'با هیجان و سرعت بالا، مثل کسایی که کنار جاده داد میزنن ویلا ویلا!'
+    ttsStylePrompt: 'با صدای سریع و بازاری، اما کاملا جدی در حال معامله. انگار مسئله مرگ و زندگی است.'
   },
   {
     id: 'taxi',
@@ -145,7 +145,7 @@ export const GAME_THEMES: GameTheme[] = [
     - Theme: The driver solving world problems while driving a Paykan without brakes.
     - Tone: Preachy, confident, completely wrong but funny.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'مثل راننده تاکسی‌های خسته اما پرحرف، با لحن نصیحت‌گرانه.'
+    ttsStylePrompt: 'با لحن تحلیلگر سیاسی، بسیار شمرده، عمیق و حق‌به‌جانب. انگار داری اخبار ساعت ۲۱ را می‌خوانی.'
   },
   {
     id: 'qajar',
@@ -166,7 +166,7 @@ export const GAME_THEMES: GameTheme[] = [
     - Theme: The Shah is angry because this person ate all the royal kebabs.
     - Tone: Flowery archaic Persian but extremely insulting.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'با لحن پیرمردی، لرزان، کش‌دار و پر از کلمات قلمبه سلمبه قجری.'
+    ttsStylePrompt: 'با لحن بسیار فاخر، ادبی و متکبرانه. مثل یک پادشاه که دارد رعیت را خطاب می‌کند. کاملا رسمی.'
   },
   {
     id: 'intellectual',
@@ -187,7 +187,7 @@ export const GAME_THEMES: GameTheme[] = [
     - Theme: Reading a poem that makes no sense.
     - Tone: Slow, whispery, fake-deep, satirical.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'با صدای آرام، خسته، و کش‌دار (مثل هنری‌های خسته).'
+    ttsStylePrompt: 'با صدایی آرام، افسرده، پوچ و بسیار فلسفی. با مکث‌های طولانی و بدون هیچ‌گونه هیجان.'
   },
   {
     id: 'mafia',
@@ -208,14 +208,14 @@ export const GAME_THEMES: GameTheme[] = [
     - Theme: This person tries to collect protection money but gets bullied by a grandma.
     - Tone: Aggressive, insulting, using Mafia slang but for ridiculous situations.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'با صدای خشن و گرفته (لات و لوت)، پر از تحقیر.'
+    ttsStylePrompt: 'کاملا جدی، ترسناک و تهدیدآمیز. مثل دون کورلئونه صحبت کن. بدون هیچ‌گونه شوخی در صدا.'
   },
   {
     id: 'documentary',
     label: 'راز بقا (حیات وحش)',
     emoji: '🦁',
     description: 'گونه‌های عجیب در طبیعت',
-    voiceName: 'Kore',
+    voiceName: 'Fenrir',
     analysisPrompt: `ROLE: You are a cynical wildlife narrator (like a mean David Attenborough).
     TASK: ROAST this human. Analyze them as a clumsy, confused animal in the wild.
     CRITICAL: Mock their appearance. If they are sitting, say they are "too lazy to hunt".
@@ -229,7 +229,7 @@ export const GAME_THEMES: GameTheme[] = [
     - Theme: The creature fails at everything (hunting, mating, hiding).
     - Tone: Roast, Satire, Scientific mockery.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'با صدای بم، مرموز و مستندوار بخوان، اما انگار داری مسخره می‌کنی.'
+    ttsStylePrompt: 'با صدای بسیار بم، عمیق و حماسی. دقیقا مثل گوینده‌های مستند نشنال جئوگرافیک. کاملا جدی باش و اصلا نخند.'
   },
   {
     id: 'vikings',
@@ -250,7 +250,7 @@ export const GAME_THEMES: GameTheme[] = [
     - Theme: They try to raid a village but get scared of a goose.
     - Tone: Epic, loud, but describing pathetic failures.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'بسیار بلند و حماسی داد بزن، انگار داری داستان یک قهرمان را میگویی اما داری مسخره میکنی.'
+    ttsStylePrompt: 'بسیار حماسی، خشن و جنگجویانه. مثل فریادهای قبل از جنگ، اما با جدیت کامل.'
   },
   {
     id: 'cyberpunk',
@@ -271,7 +271,7 @@ export const GAME_THEMES: GameTheme[] = [
     - Theme: They try to hack the bank but accidentally download a virus.
     - Tone: Robotic, cold, merciless roasting.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'صدای رباتیک، بی احساس و خشک، انگار داری گزارش خرابی سیستم میدهی.'
+    ttsStylePrompt: 'صدای کاملا رباتیک، بی‌احساس، سرد و ماشینی. مثل اعلام وضعیت قرمز سیستم.'
   }
 ];
 

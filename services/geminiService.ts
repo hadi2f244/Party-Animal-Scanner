@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, Modality, GenerateContentResponse } from "@google/genai";
 import { AnalysisResult, PersonDetected, StoryResult } from "../types";
 
@@ -160,23 +159,14 @@ export const analyzeCharacter = async (base64Image: string, focusOn: string[], c
 };
 
 export const generateRoastAudio = async (text: string, stylePrompt: string, voiceName: string = 'Kore'): Promise<string> => {
+  // Simplified prompt to prevent TTS model confusion
+  // We just ask it to read the text with the requested style/tone
   const prompt = `
-  You are a talented Persian voice actor.
+  Read the following text in Persian.
+  Tone: ${stylePrompt}
   
-  Input Script (Persian):
-  """
-  ${text}
-  """
-
-  Directives:
-  1. ACTION 1: Read the Title with high energy. DO NOT read the word "Title".
-  2. ACTION 2: Perform a SHORT VOCAL SOUND EFFECT relevant to the theme (e.g., grunt for caveman, jazz scat for mafia, drum roll).
-  3. ACTION 3: Read the Description with this style: "${stylePrompt}".
-  
-  CRITICAL:
-  - Do NOT speak English.
-  - Do NOT say "Emoji" or describe emojis.
-  - Focus on the comedy and acting.
+  Text:
+  "${text}"
   `;
 
   try {
@@ -193,10 +183,26 @@ export const generateRoastAudio = async (text: string, stylePrompt: string, voic
       },
     }));
 
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) throw new Error("No audio data returned");
+    // Robustly check for audio data in all parts
+    const parts = response.candidates?.[0]?.content?.parts;
+    if (!parts || parts.length === 0) {
+        throw new Error("Empty response from TTS model");
+    }
+
+    const audioPart = parts.find(p => p.inlineData?.data);
     
-    return base64Audio;
+    if (audioPart && audioPart.inlineData && audioPart.inlineData.data) {
+        return audioPart.inlineData.data;
+    }
+    
+    // Check for text error response (model refusal or confusion)
+    const textPart = parts.find(p => p.text);
+    if (textPart && textPart.text) {
+        console.warn("TTS Error (Model returned text):", textPart.text);
+        throw new Error(`TTS generation failed: ${textPart.text}`);
+    }
+
+    throw new Error("No audio data returned");
   } catch (error) {
     console.error("Audio Generation Failed:", error);
     throw error;
