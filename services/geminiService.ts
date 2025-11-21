@@ -79,29 +79,33 @@ export const analyzeCharacter = async (base64Image: string, focusOn: string[], c
   // Clean the base64 string if it has the header
   const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
 
-  // Use the custom prompt from settings (which is now in Persian)
+  // Use the custom prompt from settings
   let prompt = `${customPrompt}`;
   
-  // Enforce humor globally
+  // Global Style Enforcement (English instructions for better logic)
   prompt += `
-  \nدستورالعمل کلی (Global Style):
-  خروجی باید حتماً *طنز، شوخ و کمی مسخره‌کننده (Roast)* باشد. حتی اگر پرامپت بالا جدی است، تو آن را به کمدی تبدیل کن.
+  \nGLOBAL DIRECTIVE:
+  1. TONE: You are a ROAST COMEDIAN. Be mean, funny, sarcastic, and creative. Do not be boring.
+  2. LANGUAGE: The JSON output values MUST be in PERSIAN (FARSI).
+  3. CONTENT: Make fun of the person's face, pose, clothes, or vibe. Use funny metaphors.
   `;
 
   if (focusOn.length > 0) {
     prompt += `
     
-    تذکر مهم: فقط روی این افراد تمرکز کن: ${focusOn.join(", ")}.
-    بقیه افراد در پس‌زمینه را نادیده بگیر.
-    اگر چند نفر انتخاب شده‌اند، یک عنوان و توصیف گروهی برایشان بساز.`;
+    FOCUS INSTRUCTION:
+    Analyze ONLY the people matching these descriptions: ${focusOn.join(", ")}.
+    Ignore other background people.
+    If multiple people are selected, create a group title/description.`;
   } else {
     prompt += `
     
-    سوژه اصلی (یا سوژه‌های اصلی) عکس را تحلیل کن.`;
+    FOCUS INSTRUCTION:
+    Analyze the main subject(s) of the photo.`;
   }
 
   prompt += `
-    خروجی را دقیقاً با فرمت JSON زیر برگردان:`;
+    Return strictly valid JSON with this schema:`;
 
   try {
     const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
@@ -124,19 +128,19 @@ export const analyzeCharacter = async (base64Image: string, focusOn: string[], c
           properties: {
             characterTitle: {
               type: Type.STRING,
-              description: "عنوان نقش یا شخصیت طنز (به فارسی)",
+              description: "Funny/Roast character title in Persian",
             },
             emoji: {
               type: Type.STRING,
-              description: "یک یا چند ایموجی مرتبط",
+              description: "Relevant emojis",
             },
             description: {
               type: Type.STRING,
-              description: "توضیح خلاقانه، طنز و Roast که ویژگی‌های ظاهری و محیط عکس را به نقش ربط می‌دهد (به فارسی)",
+              description: "Creative roast description in Persian (max 3 sentences)",
             },
             subtitle: {
               type: Type.STRING,
-              description: "یک زیرنویس کوتاه، لقب خنده‌دار یا وضعیت (به فارسی)",
+              description: "Short funny subtitle/nickname in Persian",
             }
           },
           required: ["characterTitle", "emoji", "description", "subtitle"],
@@ -157,22 +161,22 @@ export const analyzeCharacter = async (base64Image: string, focusOn: string[], c
 
 export const generateRoastAudio = async (text: string, stylePrompt: string, voiceName: string = 'Kore'): Promise<string> => {
   const prompt = `
-  Act as a Persian voice actor and vocal sound effects artist.
+  You are a talented Persian voice actor.
   
-  Input Script:
+  Input Script (Persian):
   """
   ${text}
   """
 
   Directives:
-  1. Read the FIRST LINE (the character title) loudly and dramatically. DO NOT read the word "Title" or "Label", just the content of the first line.
-  2. After the title, PERFORM a 4-second vocal sound effect that sounds like a funny musical transition (e.g., humming a circus tune, beatboxing, or "Ba-dum-tss"). This must be done with your voice.
-  3. Pause briefly.
-  4. Read the REST of the text (the description) in Persian using this style: "${stylePrompt}".
-
-  Constraint:
-  - Output ONLY the audio performance.
-  - Do not speak any instructions or English labels.
+  1. ACTION 1: Read the Title with high energy. DO NOT read the word "Title".
+  2. ACTION 2: Perform a SHORT VOCAL SOUND EFFECT relevant to the theme (e.g., grunt for caveman, jazz scat for mafia, drum roll).
+  3. ACTION 3: Read the Description with this style: "${stylePrompt}".
+  
+  CRITICAL:
+  - Do NOT speak English.
+  - Do NOT say "Emoji" or describe emojis.
+  - Focus on the comedy and acting.
   `;
 
   try {
@@ -215,23 +219,17 @@ export const generatePartyStory = async (base64Images: string[], customPrompt: s
   const prompt = `
     ${customPrompt}
     
-    دستورالعمل کلی (Global Style):
-    داستان باید کاملاً *کمدی، طنز و خنده‌دار* باشد. شخصیت‌ها را در موقعیت‌های مسخره قرار بده.
-
-    من ${base64Images.length} عکس به ترتیب به تو داده‌ام.
+    GLOBAL STORY RULES:
+    1. TONE: Heavy Roast & Comedy. Make fun of the people in the photos.
+    2. LANGUAGE: Output MUST be in Persian (Farsi).
+    3. LOGIC: Link the photos into a funny, disastrous narrative.
+    4. FORMAT: Valid JSON.
     
-    قوانین:
-    1. یک عنوان (Title) بامزه و طنز برای داستان بساز.
-    2. برای هر عکس، شخصیت‌ها و نقششان را در داستان مشخص کن.
-    3. یک پاراگراف داستان طنز (به فارسی) برای هر عکس بنویس.
-    4. داستان باید از عکس 1 به عکس 2 و ... به صورت پیوسته جریان داشته باشد.
-    5. اگر در پس‌زمینه چیز جالبی دیدی، حتما در داستان به آن اشاره کن.
-    
-    خروجی JSON:
+    JSON Structure:
     {
-      "title": "عنوان طنز داستان",
+      "title": "Funny Persian Title",
       "pages": [
-        { "imageIndex": 0, "text": "متن داستان طنز برای عکس اول..." },
+        { "imageIndex": 0, "text": "Persian story paragraph..." },
         ...
       ]
     }

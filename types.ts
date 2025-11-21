@@ -51,281 +51,227 @@ export interface GameTheme {
   analysisPrompt: string;
   storyPrompt: string;
   ttsStylePrompt: string;
-  isCustom?: boolean; // To identify user-created themes
+  isCustom?: boolean;
 }
 
 // --- FUNNY & ROAST PROMPTS ---
 
+// Relaxed context instruction to prevent AI from obsessing over background details
 const COMMON_CONTEXT_INSTRUCTION = `
-دستورالعمل طنز (FUNNY MODE):
-1. لحن باید *شوخ، بامزه و کمی مسخره‌کننده (Roast)* باشد.
-2. اگر در محیط یا پس‌زمینه عکس نکته جالبی دیدی، می‌توانی به صورت طنز به آن اشاره کنی (اختیاری).
+CONTEXT RULE:
+Only mention background objects if they are visually hilarious or weird (e.g., a sock on a chandelier). Otherwise, focus 90% on roasting the person's face, pose, and vibe.
 `;
 
 export const GAME_THEMES: GameTheme[] = [
   {
-    id: 'documentary',
-    label: 'راز بقا (طنز)',
-    emoji: '🦁',
-    description: 'گونه‌های عجیب انسانی',
+    id: 'khastegari',
+    label: 'جلسه خواستگاری',
+    emoji: '💐',
+    description: 'زیر ذره‌بین مادرشوهر',
     voiceName: 'Kore',
-    analysisPrompt: `تو دیوید اتنبرو (David Attenborough) هستی.
-    وظیفه: این انسان را مثل یک "حیوان در حیات وحش" تحلیل کن.
-    لحن: کاملاً علمی و مستندوار اما درباره کارهای احمقانه.
-    خروجی JSON شامل:
-    - characterTitle: نام علمی گونه (مثلاً "شکارچیِ ته دیگ" یا "خفتگانِ مبل‌نشین").
-    - subtitle: وضعیت بقا (مثلاً "در کمین غذا").
-    - description: توضیح رفتار غریزی این موجود در زیستگاهش (مهمانی). به غذا خوردن یا قلمروطلبی‌اش اشاره کن.
+    analysisPrompt: `ROLE: You are a strict, judgmental Iranian Mother-in-Law (Madar Shohar) at a proposal ceremony (Khastegari).
+    TASK: Judge this person as a potential spouse for your child. They are NOT good enough.
+    CRITICAL: Roast their clothes ("Did they borrow this shirt?"), their pose ("No confidence"), and their financial status.
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: A title like "The Broke Suitor" or "The Fake Bride" (e.g., "Damad-e Asemoon Jol", "Aroos-e Ishveh-gar").
+    - subtitle: The Verdict (e.g., "Rejected due to cheap shoes").
+    - description: A monologue complaining to your neighbor about this person. "Look at how they sit! They probably don't even own a Pride."
     ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `مستندی بساز درباره تلاش این "گونه جانوری" برای بقا در جنگلِ مهمانی. روایتی از شکار طعمه (غذا)، مبارزه با نرهای دیگر برای جفت‌گیری (مخ‌زنی ناموفق) یا مهاجرت به سمت جای خنک‌تر.`,
-    ttsStylePrompt: 'با صدای مستندوار، بم، جدی و مرموز (مثل راز بقا) بخوان.'
+    storyPrompt: `A disaster Khastegari story.
+    - Theme: Spilling the tea, arguing about the Mehr (dowry), the groom sweating profusely.
+    - Tone: Gossip, judgmental, hilarious Iranian family drama.
+    OUTPUT LANGUAGE: Persian (Farsi).`,
+    ttsStylePrompt: 'با لحن پیرزن‌های فضول و غرغرو، پر از کنایه و ایش و ویش.'
+  },
+  {
+    id: 'looti',
+    label: 'داش‌مشتی (لات)',
+    emoji: '📿',
+    description: 'مرام، معرفت، پاشنه‌طلا',
+    voiceName: 'Fenrir',
+    analysisPrompt: `ROLE: You are an old-school Iranian "Looti" or "Jahel" (Tough Guy from Nazi Abad).
+    TASK: Roast this person for being a "Soolool" (Softie) trying to look tough.
+    CRITICAL: Use slang like "Chakerim", "Nokaretam", "Bache Soosool". Mock their lack of a mustache or their modern clothes.
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: A funny Looti nickname (e.g., "Esi Pashmak", "Jafar Tir-Bargh").
+    - subtitle: Street Cred (e.g., "King of the Dead End").
+    - description: Roast them for holding a phone instead of a dagger. Say they haven't eaten enough "Abgoosht".
+    ${COMMON_CONTEXT_INSTRUCTION}`,
+    storyPrompt: `A story in a traditional Teahouse (Ghahvekhaneh).
+    - Theme: Trying to start a fight but slipping on a melon skin.
+    - Tone: Deep voice, exaggerated slang, street humor.
+    OUTPUT LANGUAGE: Persian (Farsi).`,
+    ttsStylePrompt: 'با صدای کلفت، لاتی، کش‌دار و پر از اصطلاحات چاله میدانی.'
+  },
+  {
+    id: 'shomal',
+    label: 'سفر شمال (جوجه‌باز)',
+    emoji: '🏖️',
+    description: 'ترافیک، ویلا، زیرشلواری',
+    voiceName: 'Zephyr',
+    analysisPrompt: `ROLE: You are a "Villa Dealer" by the road in Northern Iran (Shomal).
+    TASK: Roast this tourist. They look like an amateur "Tehrani" tourist.
+    CRITICAL: Mock their "vacation outfit". Mention "Jujeh Kebab", "Villa Darbast", and "Chalus Traffic".
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: Tourist Type (e.g., "Jujeh Master", "The Villa Hunter").
+    - subtitle: Main Accessory (e.g., "Badban-e Kebab").
+    - description: Describe them standing in the rain thinking it's romantic, or fighting over the price of charcoal.
+    ${COMMON_CONTEXT_INSTRUCTION}`,
+    storyPrompt: `A weekend trip to Shomal that goes wrong.
+    - Theme: Stuck in traffic, rain ruins the Kebab, expensive villa.
+    - Tone: Energetic, complaining about prices, funny observational humor.
+    OUTPUT LANGUAGE: Persian (Farsi).`,
+    ttsStylePrompt: 'با هیجان و سرعت بالا، مثل کسایی که کنار جاده داد میزنن ویلا ویلا!'
+  },
+  {
+    id: 'taxi',
+    label: 'راننده تاکسی فیلسوف',
+    emoji: '🚕',
+    description: 'تحلیلگر کل خاورمیانه',
+    voiceName: 'Fenrir',
+    analysisPrompt: `ROLE: You are an opinionated Iranian Taxi Driver.
+    TASK: Analyze this passenger based on their face. You know EVERYTHING about them and politics.
+    CRITICAL: Connect their appearance to the economy, inflation, or global conspiracies. "You look like someone who buys dollars."
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: Passenger Archetype (e.g., "The Dollar Hoarder", "The Sad Student").
+    - subtitle: Diagnosis (e.g., "Victim of Inflation").
+    - description: A lecture about how this person is part of the problem. "These youths today..."
+    ${COMMON_CONTEXT_INSTRUCTION}`,
+    storyPrompt: `A taxi ride conversation.
+    - Theme: The driver solving world problems while driving a Paykan without brakes.
+    - Tone: Preachy, confident, completely wrong but funny.
+    OUTPUT LANGUAGE: Persian (Farsi).`,
+    ttsStylePrompt: 'مثل راننده تاکسی‌های خسته اما پرحرف، با لحن نصیحت‌گرانه.'
+  },
+  {
+    id: 'qajar',
+    label: 'شازده قجری',
+    emoji: '👑',
+    description: 'اندرونی و بادمجان دور قاب',
+    voiceName: 'Zephyr',
+    analysisPrompt: `ROLE: You are a satirical Court Jester in the Qajar King's harem.
+    TASK: Roast this "Prince/Princess". They are lazy, spoiled, and useless.
+    CRITICAL: Mock their weight, their sleepy eyes, or their unibrow. Use polite words to say insults ("Tasadoghat Shavam, you look like a potato").
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: A funny Royal title (e.g., "Sultan Kalle-Paz", "Fakhro-l-Tanbal").
+    - subtitle: Position (e.g., "Minister of Naps").
+    - description: Describe them waiting for a servant to peel a cucumber because they are too lazy.
+    ${COMMON_CONTEXT_INSTRUCTION}`,
+    storyPrompt: `A chronicle of the laziest royal in history.
+    - Theme: The Shah is angry because this person ate all the royal kebabs.
+    - Tone: Flowery archaic Persian but extremely insulting.
+    OUTPUT LANGUAGE: Persian (Farsi).`,
+    ttsStylePrompt: 'با لحن پیرمردی، لرزان، کش‌دار و پر از کلمات قلمبه سلمبه قجری.'
+  },
+  {
+    id: 'intellectual',
+    label: 'کافه روشنفکری',
+    emoji: '☕',
+    description: 'سیگار، قهوه و افسردگی',
+    voiceName: 'Puck',
+    analysisPrompt: `ROLE: You are a pretentiously artistic cafe owner.
+    TASK: Roast this "Intellectual". They think they are deep, but they are just confused.
+    CRITICAL: Mention "Kafka", "Cold Coffee", "Darkness", and "Cigarette smoke". Mock their scarf or glasses.
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: Artistic Name (e.g., "Sadegh Hedayat's Ghost", "The Depressed Barista").
+    - subtitle: Mood (e.g., "Existential Crisis").
+    - description: Roast their attempt to look deep. "Staring at the wall doesn't make you a poet."
+    ${COMMON_CONTEXT_INSTRUCTION}`,
+    storyPrompt: `A poetry night disaster.
+    - Theme: Reading a poem that makes no sense.
+    - Tone: Slow, whispery, fake-deep, satirical.
+    OUTPUT LANGUAGE: Persian (Farsi).`,
+    ttsStylePrompt: 'با صدای آرام، خسته، و کش‌دار (مثل هنری‌های خسته).'
   },
   {
     id: 'mafia',
     label: 'مافیای پلاستیکی',
     emoji: '🔫',
-    description: 'گنگسترهای توخالی',
+    description: 'گادفادرِ نازی‌آباد',
     voiceName: 'Fenrir',
-    analysisPrompt: `تو پدرخوانده (Godfather) هستی.
-    وظیفه: این فرد فکر می‌کند گنگستر است ولی بیشتر شبیه فروشنده پشمک است.
-    لحن: لاتی، سنگین، تهدیدآمیز اما مسخره‌کننده.
-    خروجی JSON شامل:
-    - characterTitle: لقب مافیایی ضایع (مثلاً "تونیِ تُپُل" یا "دونِ دوغ‌خور").
-    - subtitle: سمت در خانواده (مثلاً "مسئول پاک کردن سبزی").
-    - description: چرا این فرد آبروی "خانواده" را برده است؟
+    analysisPrompt: `ROLE: You are The Godfather roasting a new recruit who fails at being a gangster.
+    TASK: This person is trying to look tough but looks like a school principal. ROAST THEM.
+    CRITICAL: Tell them they hold their phone like a gun. Mock their "tough guy" pose.
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: A humiliating Mob nickname (e.g., "Jafar Palang-Kosh", "Tony the Doughnut").
+    - subtitle: Rank (e.g., "Professional Water Boy").
+    - description: Explain why they are a disgrace to the family. Maybe they are scared of the dark.
     ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `داستان یک جلسه سری مافیایی یا یک عملیات سرقت که توسط این فرد به فاجعه تبدیل می‌شود (مثلاً لو دادن عملیات به خاطر یک ساندویچ).`,
-    ttsStylePrompt: 'صدای خشن، گرفته (مثل مارلون براندو) و با لهجه لاتی.'
+    storyPrompt: `A story about a failed mafia job.
+    - Theme: This person tries to collect protection money but gets bullied by a grandma.
+    - Tone: Aggressive, insulting, using Mafia slang but for ridiculous situations.
+    OUTPUT LANGUAGE: Persian (Farsi).`,
+    ttsStylePrompt: 'با صدای خشن و گرفته (لات و لوت)، پر از تحقیر.'
   },
   {
-    id: 'qajar',
-    label: 'شازده قجری تنبل',
-    emoji: '👑',
-    description: 'اندرونی و قلیان',
-    voiceName: 'Zephyr',
-    analysisPrompt: `تو میرزا بنویسِ دربار ناصرالدین شاه هستی.
-    وظیفه: این فرد را به عنوان یکی از نوادگان تنبل و شکم‌باره قاجار معرفی کن.
-    لحن: پر از کلمات قلمبه سلمبه قدیمی (قربانت گردم، تصدقت شوم) اما مضمون مسخره.
-    خروجی JSON شامل:
-    - characterTitle: لقب قجری (مثلاً "سلطانِ خواب‌الدوله" یا "فخرالشکم").
-    - subtitle: منصب درباری (مثلاً "ناظرِ مطبخ همایونی").
-    - description: توصیف وجنات این شازده که از شدت تنبلی کپک زده است.
+    id: 'documentary',
+    label: 'راز بقا (حیات وحش)',
+    emoji: '🦁',
+    description: 'گونه‌های عجیب در طبیعت',
+    voiceName: 'Kore',
+    analysisPrompt: `ROLE: You are a cynical wildlife narrator (like a mean David Attenborough).
+    TASK: ROAST this human. Analyze them as a clumsy, confused animal in the wild.
+    CRITICAL: Mock their appearance. If they are sitting, say they are "too lazy to hunt".
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: Scientific name (e.g., "Gorilla Tanbal-us").
+    - subtitle: Survival Status (e.g., "Extinct due to stupidity").
+    - description: A harsh documentary observation roasting their lack of survival skills.
     ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `روایتی از اندرونیِ قصر و توطئه برای دزدیدن سینیِ کبابِ همایونی یا گم شدن چپقِ سلطنتی توسط این شازده.`,
-    ttsStylePrompt: 'با لحن لرزان و کش‌دار پیرمردی درباری، پر از "بله قربان".'
+    storyPrompt: `A comedy wildlife script.
+    - Theme: The creature fails at everything (hunting, mating, hiding).
+    - Tone: Roast, Satire, Scientific mockery.
+    OUTPUT LANGUAGE: Persian (Farsi).`,
+    ttsStylePrompt: 'با صدای بم، مرموز و مستندوار بخوان، اما انگار داری مسخره می‌کنی.'
   },
-  {
-    id: 'cyberpunk',
-    label: 'سایبرپانک داغون',
-    emoji: '🤖',
-    description: 'تکنولوژی چینی ۲۰۷۷',
-    voiceName: 'Charon',
-    analysisPrompt: `تو سیستم عامل یک سایبورگ ارزان‌قیمت هستی.
-    وظیفه: اسکن سوژه و مسخره کردن قطعات یدکی و باگ‌هایش.
-    لحن: رباتیک، خشک، همراه با اعلام ارور سیستم.
-    خروجی JSON شامل:
-    - characterTitle: مدل سایبورگ (مثلاً "مدل خیارشور ۳۰۰۰").
-    - subtitle: وضعیت سیستم (مثلاً "CPU: ۱٪ - ادعا: ۹۹٪").
-    - description: تحلیل ایمپلنت‌های زشت و سیم‌کشی‌های اشتباه بدن سوژه.
-    ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `داستانی در سال ۲۰۷۷ که سیستم این سایبورگ وسط یک ماموریت ساده (مثل باز کردن در) هنگ می‌کند و بلو اسکرین می‌دهد.`,
-    ttsStylePrompt: 'رباتیک، مقطع، با صدای نویز و قطع و وصل شدن.'
-  },
-  {
-    id: 'comedian',
-    label: 'روست (Roast) سنگین',
-    emoji: '🎤',
-    description: 'تخریب شخصیت کامل',
-    voiceName: 'Puck',
-    analysisPrompt: `تو بی‌ادب‌ترین استندآپ کمدین دنیا هستی.
-    وظیفه: "شستن و پهن کردن" سوژه جلوی جمعیت.
-    لحن: بسیار تند، سریع، پرانرژی و بی‌رحم.
-    خروجی JSON شامل:
-    - characterTitle: یک توهین خلاقانه.
-    - subtitle: درجه تخریب.
-    - description: یک جوک طولانی درباره قیافه، لباس و حالت صورت این فرد.
-    ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `یک خاطره ساختگی و بسیار خجالت‌آور از دوران کودکی یا مدرسه این فرد که باعث خنده حضار شود.`,
-    ttsStylePrompt: 'سریع، پرانرژی، با صدای خنده تمسخرآمیز.'
-  },
-
-  // --- HISTORY & EPIC PARODIES ---
   {
     id: 'vikings',
     label: 'وایکینگِ دریازده',
     emoji: '🪓',
-    description: 'جنگجویی که از خون می‌ترسد',
+    description: 'جنگجوی ترسو',
     voiceName: 'Fenrir',
-    analysisPrompt: `تو راوی حماسه‌های وایکینگ هستی.
-    وظیفه: توصیف این جنگجو که مایه ننگ اودین و والهالا است.
-    لحن: حماسی ولی پر از ناامیدی از این فرد.
-    خروجی: لقبی مثل "راگنارِ شلوار خیس" و توضیح اینکه چرا تبرش پلاستیکی است. ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `حماسه حمله به روستای همسایه (آشپزخانه) برای غارت انبار غذا و فرار کردن با دیدن یک سوسک.`,
-    ttsStylePrompt: 'بلند، حماسی و خشن، مثل فریاد جنگی.'
+    analysisPrompt: `ROLE: You are Odin, and you are disappointed.
+    TASK: Roast this weak "warrior". They wouldn't survive 2 minutes in Valhalla.
+    CRITICAL: Say their "battle cry" sounds like a sneezing kitten. Mock their lack of muscles.
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: Viking Name (e.g., "Ragnar the Chicken-Hearted").
+    - subtitle: Achievement (e.g., "Conquered a bowl of soup").
+    - description: A saga about how they cried when they got a papercut.
+    ${COMMON_CONTEXT_INSTRUCTION}`,
+    storyPrompt: `The Saga of the Weakest Viking.
+    - Theme: They try to raid a village but get scared of a goose.
+    - Tone: Epic, loud, but describing pathetic failures.
+    OUTPUT LANGUAGE: Persian (Farsi).`,
+    ttsStylePrompt: 'بسیار بلند و حماسی داد بزن، انگار داری داستان یک قهرمان را میگویی اما داری مسخره میکنی.'
   },
   {
-    id: 'gladiator',
-    label: 'گلادیاتورِ سوسول',
-    emoji: '⚔️',
-    description: 'مبارزه با پشه‌کش',
-    voiceName: 'Kore',
-    analysisPrompt: `تو گزارشگر میدان نبرد در روم باستان هستی.
-    این گلادیاتور با این قیافه اومده وسط میدان؟ سلاحش چیه؟ دمپایی؟
-    توضیح بده چرا شیرها رغبت نمی‌کنن این رو بخورن. ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `گزارش زنده از نبرد خونین در کولوسئوم که این فرد سعی دارد با ناز کردن برای شیر، جانش را نجات دهد.`,
-    ttsStylePrompt: 'آمرانه، بلند، مثل سخنرانی امپراتور.'
-  },
-  {
-    id: 'caveman',
-    label: 'غارنشینِ بی‌سواد',
-    emoji: '🦴',
-    description: 'کشف آتش (اشتباهی)',
-    voiceName: 'Fenrir',
-    analysisPrompt: `تو رئیس قبیله غارنشین‌ها هستی.
-    این انسان اولیه هنوز نمیدونه سنگ سفته. بهش میگن "کله پوک".
-    توضیح بده چطوری سعی کرد با ماموت کشتی بگیره و له شد. ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `روایت تلاش قبیله برای شکار ماموت، در حالی که این فرد مشغول نقاشی کشیدن روی دیوار غار بود و شکار فرار کرد.`,
-    ttsStylePrompt: 'بدوی، ساده، با صداهای اوه اوه و آره آره.'
-  },
-
-  // --- FANTASY & MAGIC PARODIES ---
-  {
-    id: 'harrypotter',
-    label: 'جادوگر مشروطی',
-    emoji: '🧙‍♂️',
-    description: 'اخراجی هاگوارتز',
-    voiceName: 'Zephyr',
-    analysisPrompt: `تو کلاه گروه‌بندی (Sorting Hat) هستی.
-    این بچه هیچ استعدادی نداره. چوب دستی‌اش رو برعکس گرفته.
-    بگو چرا باید بره گروه "ماگل‌های خنگ". ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `داستان کلاس معجون‌سازی که این فرد اشتباهی معجون "تبدیل به قورباغه" را روی خودش می‌ریزد.`,
-    ttsStylePrompt: 'پیر، غرغرو و مرموز.'
-  },
-  {
-    id: 'zombie',
-    label: 'زامبی گیاه‌خوار',
-    emoji: '🧟',
-    description: 'آخرالزمان خنده‌دار',
-    voiceName: 'Fenrir',
-    analysisPrompt: `تو یک بازمانده آخرالزمان هستی.
-    این زامبی انقدر تنبله که حال نداره مغز بخوره، کاهو میخوره.
-    قیافه‌اش رو توصیف کن که چقدر شل و وله. ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `روایت حمله زامبی‌ها به شهر، اما این زامبی راهش را گم می‌کند و سر از کلاس رقص در می‌آورد.`,
-    ttsStylePrompt: 'با ناله، خرناس و کش‌دار (مثل زامبی).'
-  },
-  {
-    id: 'alien',
-    label: 'فضاییِ گیج',
-    emoji: '👽',
-    description: 'توریست فضایی',
+    id: 'cyberpunk',
+    label: 'سایبرپانکِ اوراقی',
+    emoji: '🤖',
+    description: 'تکنولوژی چینی ۲۰۷۷',
     voiceName: 'Charon',
-    analysisPrompt: `تو فرمانده سفینه فضایی هستی.
-    این موجود (انسان) را دزدیده‌ایم اما خیلی کودن است.
-    تحلیل کن چرا ارزش آزمایش کردن ندارد و باید پرتش کنیم بیرون. ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `گزارش ماموریت در سیاره زمین: تلاش ناموفق برای ارتباط با گاوها به جای آدم‌ها.`,
-    ttsStylePrompt: 'صدای بیز بیز، عجیب و غریب و فضایی.'
-  },
-
-  // --- IRANIAN CULTURE & JOBS PARODIES ---
-  {
-    id: 'taxi',
-    label: 'راننده تاکسی فیلسوف',
-    emoji: '🚕',
-    description: 'تحلیل‌گر خاورمیانه',
-    voiceName: 'Fenrir',
-    analysisPrompt: `تو راننده تاکسی خطی خسته هستی.
-    به قیافه این مسافر نگاه کن و یک تحلیل سیاسی-اقتصادی بی‌ربط بباف.
-    مثلاً "چون جورابت سوراخه، دلار رفته بالا". ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `ماجرای بحث سیاسی در تاکسی که راننده ثابت می‌کند این مسافر عامل گرمایش زمین و ترافیک همت است.`,
-    ttsStylePrompt: 'عامیانه، طلبکار، با صدای بوق خیالی.'
-  },
-  {
-    id: 'wedding',
-    label: 'مهمانِ شام‌دوست',
-    emoji: '💃',
-    description: 'فقط برای غذا آمده',
-    voiceName: 'Puck',
-    analysisPrompt: `تو فیلمبردار عروسی هستی.
-    این مهمان فقط دم میز شام می‌پلکه.
-    توصیف کن چطور با نگاهش غذاها را اسکن می‌کند و منتظر حمله است. ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `داستان حماسیِ حمله به میز سلف‌سرویس و رقابت با بقیه مهمان‌ها برای گرفتن آخرین تکه ته دیگ.`,
-    ttsStylePrompt: 'پچ پچ کنان و با خنده‌های ریز.'
-  },
-  {
-    id: 'khastegari',
-    label: 'خواستگارِ پشیمان',
-    emoji: '💐',
-    description: 'سوتی در مجلس',
-    voiceName: 'Zephyr',
-    analysisPrompt: `تو مادر شوهر/مادر زن سختگیر هستی.
-    با ذره‌بین نگاه کن. "وای خدا مرگم بده، چرا این شکلیه؟"
-    ایرادهای بنی‌اسرائیلی بگیر و به فک و فامیلش گیر بده. ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `روایت مجلس خواستگاری که با ریختن چای داغ روی شلوار پدر عروس/داماد به میدان جنگ تبدیل می‌شود.`,
-    ttsStylePrompt: 'جیغ‌جیغو، نگران و زنانه (به سبک خاله‌زنک).'
-  },
-
-  // --- MODERN LIFE PARODIES ---
-  {
-    id: 'influencer',
-    label: 'شاخِ مجازیِ فیک',
-    emoji: '📱',
-    description: 'زندگی لاکچریِ قرضی',
-    voiceName: 'Puck',
-    analysisPrompt: `تو ادمین پیج‌های افشاگر هستی.
-    این اینفلوئنسر همه چیزش فیکه. لباساش قرضیه، لوکیشنش فتوشاپه.
-    مسخره کن ژست "یهویی" که گرفته در حالی که ۳ ساعت آرایش کرده. ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `داستان لایو اینستاگرام که وسطش مامانش با دمپایی میاد تو اتاق و آبروش رو می‌بره.`,
-    ttsStylePrompt: 'لوس، با عشوه، هی میگه "گایز" و "عزیزم".'
-  },
-  {
-    id: 'programmer',
-    label: 'برنامه‌نویسِ افسرده',
-    emoji: '💻',
-    description: 'قهوه و باگ',
-    voiceName: 'Charon',
-    analysisPrompt: `تو مدیر پروژه (Project Manager) هستی.
-    این برنامه‌نویس چرا شبیه زامبی شده؟ باگ‌های کُدش از تعداد موهای سرش بیشتره.
-    توصیف کن که چطور با کیبورد حرف میزنه. ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `داستان روزی که سرورها پاک شد چون این فرد روی دکمه Delete خوابش برد.`,
-    ttsStylePrompt: 'خسته، بی حال، یکنواخت.'
-  },
-  {
-    id: 'gym',
-    label: 'سلطانِ آمپول',
-    emoji: '💪',
-    description: 'فیگور غلط',
-    voiceName: 'Fenrir',
-    analysisPrompt: `تو مربی بدنسازی (آقا بیت‌الله) هستی.
-    این بچه سوسول فقط بازو فتوشاپ کرده. پاهاش مثل "نی قلیون" میمونه.
-    مسخره کن که اومده باشگاه فقط عکس بگیره. ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `لحظه‌ای که زیر وزنه ۲۰ کیلویی گیر کرد و داد زد "مامانم رو صدا کنید" و آبروش تو باشگاه رفت.`,
-    ttsStylePrompt: 'صدای کلفت اغراق‌آمیز، نفس‌نفس‌زنان.'
-  },
-
-  // --- ABSTRACT & WEIRD FUNNY ---
-  {
-    id: 'object',
-    label: 'شیء بی‌مصرف',
-    emoji: '🛋️',
-    description: 'اگر انسان نبودید',
-    voiceName: 'Charon',
-    analysisPrompt: `اگر این آدم یه وسیله تو خونه بود، چی می‌شد؟
-    قطعاً یه "کنترل تلویزیون که باتری نداره" یا "شیلنگ توالت سوراخ".
-    توضیح بده چرا انقدر بی‌خاصیت و جاگیر است. ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `خاطرات یک روز از زندگی این شیء: لگد خوردن، گم شدن زیر مبل و پیدا نشدن.`,
-    ttsStylePrompt: 'بی‌تفاوت، خشک و شیء‌وار.'
-  },
-  {
-    id: 'ghost',
-    label: 'روحِ ترسو',
-    emoji: '👻',
-    description: 'کاسپر بی‌مزه',
-    voiceName: 'Charon',
-    analysisPrompt: `این روح انقدر بی‌عرضه است که کسی ازش نمی‌ترسه.
-    مردم فکر می‌کنن ملافه آویزونه که باد می‌خوره.
-    توضیح بده چرا هنوز نتونسته کسی رو بترسونه (شاید چون خودش از تاریکی می‌ترسه). ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `شبی در خانه متروکه که این روح سعی کرد صاحبخانه را بترساند ولی خودش از صدای گربه سکته کرد.`,
-    ttsStylePrompt: 'لرزان، هوهو کنان، ولی خنده‌دار.'
+    analysisPrompt: `ROLE: You are a high-tech AI scanner.
+    TASK: Roast this cyborg. Their parts are cheap Chinese knock-offs.
+    CRITICAL: List their "system errors". Say their brain processor is from 1990 (Floppy Disk).
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: Model Name (e.g., "Terminator from Divar").
+    - subtitle: Status (e.g., "Blue Screen of Death").
+    - description: Analytical roast of their low-budget tech and glitchy face.
+    ${COMMON_CONTEXT_INSTRUCTION}`,
+    storyPrompt: `A hacker mission gone wrong.
+    - Theme: They try to hack the bank but accidentally download a virus.
+    - Tone: Robotic, cold, merciless roasting.
+    OUTPUT LANGUAGE: Persian (Farsi).`,
+    ttsStylePrompt: 'صدای رباتیک، بی احساس و خشک، انگار داری گزارش خرابی سیستم میدهی.'
   }
 ];
 
@@ -335,7 +281,6 @@ export interface AppSettings {
   ttsStylePrompt: string;
   selectedThemeId: string;
   voiceName: string;
-  // We will persist custom themes in local storage separately, but keeping settings simple
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
