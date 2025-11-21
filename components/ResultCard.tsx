@@ -1,10 +1,10 @@
 
 import React, { useState, useRef } from 'react';
-import { AnimalResult } from '../types';
+import { AnalysisResult } from '../types';
 import { Share2, RotateCcw, Volume2, Loader2, StopCircle } from 'lucide-react';
 
 interface ResultCardProps {
-  result: AnimalResult;
+  result: AnalysisResult;
   imageSrc: string;
   onReset: () => void;
   customAudioGenerator: (text: string) => Promise<string>;
@@ -129,10 +129,10 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
         <div className="p-6 pt-2 text-center space-y-4">
             <div>
                 <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-600 mb-1 leading-tight">
-                    {result.animal}
+                    {result.characterTitle}
                 </h2>
-                <span className="inline-block px-3 py-1 text-xs font-bold rounded-full bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 mt-2">
-                    درجه سوختگی: {result.roastLevel}
+                <span className="inline-block px-3 py-1 text-xs font-bold rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 mt-2">
+                    {result.subtitle}
                 </span>
             </div>
 
@@ -153,17 +153,17 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
                      {isLoadingAudio ? (
                         <>
                             <Loader2 size={16} className="animate-spin" />
-                            <span>در حال ساخت ویس...</span>
+                            <span>در حال ساخت روایت...</span>
                         </>
                      ) : isPlaying ? (
                         <>
                             <StopCircle size={16} />
-                            <span>توقف صدا</span>
+                            <span>توقف روایت</span>
                         </>
                      ) : (
                         <>
                             <Volume2 size={16} />
-                            <span>پخش توضیحات صوتی</span>
+                            <span>پخش روایت صوتی</span>
                         </>
                      )}
                    </button>
@@ -183,8 +183,8 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
                     onClick={() => {
                         if (navigator.share) {
                             navigator.share({
-                                title: 'حیوان درون ما',
-                                text: `ما شبیه ${result.animal} هستیم! ${result.description}`,
+                                title: 'روایتگر',
+                                text: `نقش من: ${result.characterTitle}! ${result.description}`,
                             }).catch(console.error);
                         } else {
                             alert('اشتراک‌گذاری در این مرورگر پشتیبانی نمی‌شود');

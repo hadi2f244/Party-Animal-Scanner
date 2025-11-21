@@ -1,17 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { Camera, Upload, Sparkles, PartyPopper, CheckCircle2, Circle, ArrowLeft, BookOpen, Clock, Loader2, Settings } from 'lucide-react';
-import { analyzePartyGuest, detectPeopleInImage, generatePartyStory, generateRoastAudio } from './services/geminiService';
+import { analyzeCharacter, detectPeopleInImage, generatePartyStory, generateRoastAudio } from './services/geminiService';
 import { CameraView } from './components/CameraView';
 import { ResultCard } from './components/ResultCard';
 import { StoryPlayer } from './components/StoryPlayer';
 import { SettingsView } from './components/SettingsView';
-import { AnimalResult, AppState, PersonDetected, StoryResult, LoadingProgress, AppSettings, DEFAULT_SETTINGS } from './types';
+import { AnalysisResult, AppState, PersonDetected, StoryResult, LoadingProgress, AppSettings, DEFAULT_SETTINGS } from './types';
 
 export const App: React.FC = () => {
   const [appState, setAppState] = useState<AppState>(AppState.HOME);
   const [imageSrc, setImageSrc] = useState<string>('');
-  const [result, setResult] = useState<AnimalResult | null>(null);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loadingMessage, setLoadingMessage] = useState<string>('در حال پردازش...');
   
   // Selection flow state
@@ -28,7 +28,7 @@ export const App: React.FC = () => {
 
   // Load settings from local storage on mount
   useEffect(() => {
-    const savedSettings = localStorage.getItem('partyApp_settings_v5');
+    const savedSettings = localStorage.getItem('partyApp_settings_v6');
     if (savedSettings) {
         try {
             const parsed = JSON.parse(savedSettings);
@@ -42,16 +42,16 @@ export const App: React.FC = () => {
 
   const saveSettings = (newSettings: AppSettings) => {
       setSettings(newSettings);
-      localStorage.setItem('partyApp_settings_v5', JSON.stringify(newSettings));
+      localStorage.setItem('partyApp_settings_v6', JSON.stringify(newSettings));
       setAppState(AppState.HOME);
   };
 
   const funnyLoadingMessages = [
     "در حال اسکن چهره‌ها...",
-    "تماس با کارشناسان...",
-    "مقایسه با گونه‌های کمیاب...",
-    "تحلیل میمیک صورت...",
-    "جستجو در دیتابیس...",
+    "در حال هماهنگی با بازیگران...",
+    "بررسی سوابق تاریخی...",
+    "تحلیل شخصیت...",
+    "نوشتن سناریو...",
   ];
 
   // --- Standard Mode Functions ---
@@ -87,7 +87,7 @@ export const App: React.FC = () => {
 
     try {
       // Pass custom prompt from settings
-      const analysisResult = await analyzePartyGuest(src, focusLabels, settings.analysisPrompt);
+      const analysisResult = await analyzeCharacter(src, focusLabels, settings.analysisPrompt);
       setResult(analysisResult);
       setAppState(AppState.RESULT);
     } catch (error) {
@@ -211,7 +211,7 @@ export const App: React.FC = () => {
         const img = new Image();
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_SIZE = 1024;
+          const MAX_SIZE = 800; // Reduced from 1024 to 800 to prevent errors
           let w = img.width;
           let h = img.height;
           
@@ -230,8 +230,10 @@ export const App: React.FC = () => {
           canvas.width = w;
           canvas.height = h;
           const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.7));
+          if (ctx) {
+              ctx.drawImage(img, 0, 0, w, h);
+              resolve(canvas.toDataURL('image/jpeg', 0.6)); // Quality 0.6
+          }
         };
         img.src = e.target?.result as string;
       };
@@ -291,10 +293,10 @@ export const App: React.FC = () => {
                     <PartyPopper className="w-10 h-10 text-white" />
                 </div>
                 <h1 className="text-4xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">
-                    حیوان درونت چیه؟
+                    روایتگر
                 </h1>
                 <p className="text-gray-400 text-lg">
-                    ابزار هوشمند برای سرگرمی مهمونی‌ها
+                    داستان‌سرای هوشمند برای مهمونی‌ها
                 </p>
             </div>
 
@@ -304,8 +306,8 @@ export const App: React.FC = () => {
                     className="w-full group flex items-center justify-between p-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 transition-all duration-200 transform hover:scale-[1.02] shadow-xl shadow-blue-900/30"
                 >
                     <div className="text-right">
-                        <span className="block text-xl font-bold">تحلیل تکی/گروهی</span>
-                        <span className="text-indigo-200 text-sm">یه عکس بگیر و ببین شبیه چی هستن!</span>
+                        <span className="block text-xl font-bold">تحلیل شخصیت</span>
+                        <span className="text-indigo-200 text-sm">یه عکس بگیر و نقشش رو ببین!</span>
                     </div>
                     <div className="bg-white/20 p-3 rounded-full">
                         <Camera className="w-8 h-8 text-white" />
@@ -317,8 +319,8 @@ export const App: React.FC = () => {
                     className="w-full group flex items-center justify-between p-6 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 transition-all duration-200 transform hover:scale-[1.02] shadow-xl shadow-pink-900/30"
                 >
                     <div className="text-right">
-                        <span className="block text-xl font-bold">داستان‌سازی خودکار</span>
-                        <span className="text-pink-200 text-sm">چند تا عکس بگیر تا برات قصه بسازم</span>
+                        <span className="block text-xl font-bold">داستان‌سازی</span>
+                        <span className="text-pink-200 text-sm">چند تا عکس بگیر تا قصه بسازم</span>
                     </div>
                     <div className="bg-white/20 p-3 rounded-full">
                         <BookOpen className="w-8 h-8 text-white" />
@@ -495,7 +497,7 @@ export const App: React.FC = () => {
             </div>
             <h3 className="text-2xl font-bold text-white">ای وای! نشد...</h3>
             <p className="text-gray-400 max-w-xs">
-                هوش مصنوعی نتونست چهره رو تشخیص بده یا اینترنتت ضعیفه. دوباره تلاش کن!
+                هوش مصنوعی نتونست چهره رو تشخیص بده یا ممکنه اینترنت قطع شده باشه. دوباره تلاش کن!
             </p>
             <button 
                 onClick={resetApp}

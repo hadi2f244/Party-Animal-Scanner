@@ -52,7 +52,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentSettings, onS
       <div className="absolute top-0 left-0 right-0 p-4 bg-gray-900/90 backdrop-blur-md border-b border-gray-800 shadow-lg z-20 flex items-center justify-between">
         <div className="flex items-center gap-2 text-white">
           <SettingsIcon className="w-6 h-6 text-purple-400" />
-          <h2 className="text-xl font-bold">تنظیمات بازی</h2>
+          <h2 className="text-xl font-bold">تنظیمات روایتگر</h2>
         </div>
         <button 
           onClick={onClose}
@@ -69,9 +69,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentSettings, onS
         <div className="space-y-4">
             <div className="flex items-center justify-between">
                  <label className="block text-blue-300 font-bold text-lg">
-                    ژانر و تم بازی
+                    ژانر داستان
                 </label>
-                <span className="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">تغییر همزمان لحن، داستان و صدا</span>
+                <span className="text-xs text-gray-500 bg-gray-800 px-2 py-1 rounded">تغییر لحن و شخصیت‌پردازی</span>
             </div>
            
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -116,7 +116,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentSettings, onS
             {/* Analysis Prompt */}
             <div className="space-y-2">
             <label className="block text-purple-300 font-bold text-sm">
-                دستورالعمل تحلیل تصویر
+                دستورالعمل تحلیل شخصیت
             </label>
             <textarea
                 value={settings.analysisPrompt}
@@ -131,7 +131,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ currentSettings, onS
             {/* Story Prompt */}
             <div className="space-y-2">
             <label className="block text-pink-300 font-bold text-sm">
-                دستورالعمل داستان‌سازی
+                دستورالعمل سناریو
             </label>
             <textarea
                 value={settings.storyPrompt}

@@ -1,6 +1,6 @@
 {
-  "name": "Party Animal Scanner",
-  "description": "A fun party app that analyzes guests' photos to tell them which animal they resemble with a humorous twist.",
+  "name": "Ravayatgar",
+  "description": "A versatile AI narrator that analyzes photos to tell stories in various genres like Wildlife, Mafia, History, and Sci-Fi.",
   "requestFramePermissions": [
     "camera"
   ]

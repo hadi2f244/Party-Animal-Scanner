@@ -1,14 +1,28 @@
 
-import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { AnimalResult, PersonDetected, StoryResult } from "../types";
+import { GoogleGenAI, Type, Modality, GenerateContentResponse } from "@google/genai";
+import { AnalysisResult, PersonDetected, StoryResult } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+// Simple retry utility for API calls
+const retry = async <T>(fn: () => Promise<T>, retries = 2): Promise<T> => {
+  try {
+    return await fn();
+  } catch (e) {
+    if (retries > 0) {
+      console.warn(`API Call Failed. Retrying... Attempts left: ${retries}`, e);
+      await new Promise(r => setTimeout(r, 1000));
+      return retry(fn, retries - 1);
+    }
+    throw e;
+  }
+};
 
 export const detectPeopleInImage = async (base64Image: string): Promise<PersonDetected[]> => {
   const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: {
         parts: [
@@ -48,7 +62,7 @@ export const detectPeopleInImage = async (base64Image: string): Promise<PersonDe
           }
         }
       }
-    });
+    }));
 
     const text = response.text;
     if (!text) return [];
@@ -61,7 +75,7 @@ export const detectPeopleInImage = async (base64Image: string): Promise<PersonDe
   }
 };
 
-export const analyzePartyGuest = async (base64Image: string, focusOn: string[], customPrompt: string): Promise<AnimalResult> => {
+export const analyzeCharacter = async (base64Image: string, focusOn: string[], customPrompt: string): Promise<AnalysisResult> => {
   // Clean the base64 string if it has the header
   const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
 
@@ -76,24 +90,19 @@ export const analyzePartyGuest = async (base64Image: string, focusOn: string[], 
     Ignore anyone else in the background.
     
     Since there are multiple selected people (or a specific subset):
-    Describe them as a group or pair. Assign a collective animal theme (e.g. "Monkey Troupe", "The Hyena Squad") or a combo name.
-    In the description, briefly roast these specific people based on their visual traits.`;
+    Assign a collective Title and Description for the group based on the persona/theme.`;
   } else {
     prompt += `
     
     IMPORTANT INSTRUCTION:
-    If there is ONE person:
-    Decide what animal they resemble.
-    
-    If there are MULTIPLE people:
-    Describe them as a group. Assign a collective animal theme.`;
+    Analyze the main subject(s) in the frame.`;
   }
 
   prompt += `
     Return the result in this strict JSON structure:`;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: {
         parts: [
@@ -111,32 +120,32 @@ export const analyzePartyGuest = async (base64Image: string, focusOn: string[], 
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            animal: {
+            characterTitle: {
               type: Type.STRING,
-              description: "The name of the animal or group name (e.g. 'Gorilla Team') in Persian",
+              description: "The name of the character, animal, or role assigned to the person (in Persian)",
             },
             emoji: {
               type: Type.STRING,
-              description: "One or more emojis representing the person or group members (e.g. '🦁' or '🦁🐯')",
+              description: "One or more emojis representing the character",
             },
             description: {
               type: Type.STRING,
-              description: "A short, clear, and witty explanation connecting specific visual features (eyes, smile, hair, pose) to the animal. Use casual Persian.",
+              description: "A short, creative explanation connecting visual features to the character role. Use casual Persian.",
             },
-            roastLevel: {
+            subtitle: {
               type: Type.STRING,
-              description: "A short funny label for how bad the roast is (e.g., 'Mild', 'Spicy', 'Nuclear') in Persian",
+              description: "A short label, status, power level, or roast level in Persian",
             }
           },
-          required: ["animal", "emoji", "description", "roastLevel"],
+          required: ["characterTitle", "emoji", "description", "subtitle"],
         },
       },
-    });
+    }));
 
     const text = response.text;
     if (!text) throw new Error("No response text from Gemini");
     
-    return JSON.parse(text) as AnimalResult;
+    return JSON.parse(text) as AnalysisResult;
 
   } catch (error) {
     console.error("Gemini Analysis Failed:", error);
@@ -154,7 +163,7 @@ export const generateRoastAudio = async (text: string, stylePrompt: string, voic
   `;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
       contents: [{ parts: [{ text: prompt }] }],
       config: {
@@ -165,7 +174,7 @@ export const generateRoastAudio = async (text: string, stylePrompt: string, voic
           },
         },
       },
-    });
+    }));
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
     if (!base64Audio) throw new Error("No audio data returned");
@@ -197,9 +206,9 @@ export const generatePartyStory = async (base64Images: string[], customPrompt: s
     I have provided ${base64Images.length} photos in order.
     
     Rules:
-    1. Create a Title for the story (Must be Jungle/Adventure themed).
-    2. For EACH photo, visually identify the "Animal" the person looks like.
-    3. Write a paragraph of the story (in Persian) centered around this animal character in the jungle.
+    1. Create a Title for the story.
+    2. For EACH photo, visually identify the Character/Role based on the theme.
+    3. Write a paragraph of the story (in Persian) centered around this character.
     4. The story must flow logically from photo 1 to photo 2.
     
     Return JSON:
@@ -207,7 +216,6 @@ export const generatePartyStory = async (base64Images: string[], customPrompt: s
       "title": "Story Title",
       "pages": [
         { "imageIndex": 0, "text": "Story part for first photo..." },
-        { "imageIndex": 1, "text": "Story part for second photo..." }
         ...
       ]
     }
@@ -216,7 +224,7 @@ export const generatePartyStory = async (base64Images: string[], customPrompt: s
   parts.push({ text: prompt });
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: { parts: parts },
       config: {
@@ -240,7 +248,7 @@ export const generatePartyStory = async (base64Images: string[], customPrompt: s
           required: ["title", "pages"]
         }
       }
-    });
+    }));
 
     const text = response.text;
     if (!text) throw new Error("No response text");
