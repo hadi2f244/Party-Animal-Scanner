@@ -37,7 +37,7 @@ export const detectPeopleInImage = async (base64Image: string): Promise<PersonDe
             Return a JSON object with a "people" array.
             Each item should have:
             - "id": a unique short string (e.g. "p1", "p2")
-            - "label": a very short visual description in Persian to help the user identify them (e.g. "مرد با کلاه قرمز", "خانم سمت چپ", "کودک خندان").
+            - "label": a very short visual description written in Persian (Farsi) language (e.g. "مرد با کلاه قرمز", "خانم سمت چپ").
             
             If no people are clearly visible, return an empty array.`
           }
@@ -82,6 +82,12 @@ export const analyzeCharacter = async (base64Image: string, focusOn: string[], c
   // Use the custom prompt from settings (which is now in Persian)
   let prompt = `${customPrompt}`;
   
+  // Enforce humor globally
+  prompt += `
+  \nدستورالعمل کلی (Global Style):
+  خروجی باید حتماً *طنز، شوخ و کمی مسخره‌کننده (Roast)* باشد. حتی اگر پرامپت بالا جدی است، تو آن را به کمدی تبدیل کن.
+  `;
+
   if (focusOn.length > 0) {
     prompt += `
     
@@ -118,7 +124,7 @@ export const analyzeCharacter = async (base64Image: string, focusOn: string[], c
           properties: {
             characterTitle: {
               type: Type.STRING,
-              description: "عنوان نقش یا شخصیت (به فارسی)",
+              description: "عنوان نقش یا شخصیت طنز (به فارسی)",
             },
             emoji: {
               type: Type.STRING,
@@ -126,11 +132,11 @@ export const analyzeCharacter = async (base64Image: string, focusOn: string[], c
             },
             description: {
               type: Type.STRING,
-              description: "توضیح خلاقانه که ویژگی‌های ظاهری و محیط عکس را به نقش ربط می‌دهد (به فارسی)",
+              description: "توضیح خلاقانه، طنز و Roast که ویژگی‌های ظاهری و محیط عکس را به نقش ربط می‌دهد (به فارسی)",
             },
             subtitle: {
               type: Type.STRING,
-              description: "یک زیرنویس کوتاه، لقب یا وضعیت (به فارسی)",
+              description: "یک زیرنویس کوتاه، لقب خنده‌دار یا وضعیت (به فارسی)",
             }
           },
           required: ["characterTitle", "emoji", "description", "subtitle"],
@@ -150,12 +156,23 @@ export const analyzeCharacter = async (base64Image: string, focusOn: string[], c
 };
 
 export const generateRoastAudio = async (text: string, stylePrompt: string, voiceName: string = 'Kore'): Promise<string> => {
-  // Include the style instructions for the reader
+  // We construct a prompt that acts as a strict "Voice Actor" directive.
+  // We explicitly tell it NOT to read the instructions.
   const prompt = `
-  ${stylePrompt}
+  Act as a professional voice actor.
   
-  متن زیر را بخوان:
-  "${text}"
+  Style Instructions: ${stylePrompt}
+  Language: Persian (Farsi)
+
+  TASK: Read the text inside the quote block below ALOUD.
+  CRITICAL RULES:
+  1. Do NOT read the instructions.
+  2. Do NOT say "Here is the text" or "Sure".
+  3. ONLY speak the text itself with the requested emotion.
+
+  """
+  ${text}
+  """
   `;
 
   try {
@@ -197,21 +214,24 @@ export const generatePartyStory = async (base64Images: string[], customPrompt: s
 
   const prompt = `
     ${customPrompt}
+    
+    دستورالعمل کلی (Global Style):
+    داستان باید کاملاً *کمدی، طنز و خنده‌دار* باشد. شخصیت‌ها را در موقعیت‌های مسخره قرار بده.
 
     من ${base64Images.length} عکس به ترتیب به تو داده‌ام.
     
     قوانین:
-    1. یک عنوان (Title) جذاب برای داستان بساز.
+    1. یک عنوان (Title) بامزه و طنز برای داستان بساز.
     2. برای هر عکس، شخصیت‌ها و نقششان را در داستان مشخص کن.
-    3. یک پاراگراف داستان (به فارسی) برای هر عکس بنویس.
+    3. یک پاراگراف داستان طنز (به فارسی) برای هر عکس بنویس.
     4. داستان باید از عکس 1 به عکس 2 و ... به صورت پیوسته جریان داشته باشد.
-    5. حیاتی: حتماً محیط و پس‌زمینه هر عکس را در داستان توصیف کن (مثلاً "در آشپزخانه تاریک..." یا "روی مبل راحتی...").
+    5. حیاتی: حتماً محیط و پس‌زمینه هر عکس را به شکلی خنده‌دار در داستان توصیف کن (مثلاً شلوغی اتاق را به "میدان جنگ" تشبیه کن).
     
     خروجی JSON:
     {
-      "title": "عنوان داستان",
+      "title": "عنوان طنز داستان",
       "pages": [
-        { "imageIndex": 0, "text": "متن داستان برای عکس اول..." },
+        { "imageIndex": 0, "text": "متن داستان طنز برای عکس اول..." },
         ...
       ]
     }

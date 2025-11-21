@@ -72,8 +72,11 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
         await audioContextRef.current.resume();
       }
 
+      // Combine title and description for a better narration flow
+      const textToRead = `${result.characterTitle}... ${result.description}`;
+
       // Fetch Audio using the custom generator (which injects the settings)
-      const base64Audio = await customAudioGenerator(result.description);
+      const base64Audio = await customAudioGenerator(textToRead);
       
       // Decode and Play
       const audioBytes = decode(base64Audio);
