@@ -156,23 +156,23 @@ export const analyzeCharacter = async (base64Image: string, focusOn: string[], c
 };
 
 export const generateRoastAudio = async (text: string, stylePrompt: string, voiceName: string = 'Kore'): Promise<string> => {
-  // We construct a prompt that acts as a strict "Voice Actor" directive.
-  // We explicitly tell it NOT to read the instructions.
   const prompt = `
-  Act as a professional voice actor.
+  Act as a Persian voice actor and vocal sound effects artist.
   
-  Style Instructions: ${stylePrompt}
-  Language: Persian (Farsi)
-
-  TASK: Read the text inside the quote block below ALOUD.
-  CRITICAL RULES:
-  1. Do NOT read the instructions.
-  2. Do NOT say "Here is the text" or "Sure".
-  3. ONLY speak the text itself with the requested emotion.
-
+  Input Script:
   """
   ${text}
   """
+
+  Directives:
+  1. Read the FIRST LINE (the character title) loudly and dramatically. DO NOT read the word "Title" or "Label", just the content of the first line.
+  2. After the title, PERFORM a 4-second vocal sound effect that sounds like a funny musical transition (e.g., humming a circus tune, beatboxing, or "Ba-dum-tss"). This must be done with your voice.
+  3. Pause briefly.
+  4. Read the REST of the text (the description) in Persian using this style: "${stylePrompt}".
+
+  Constraint:
+  - Output ONLY the audio performance.
+  - Do not speak any instructions or English labels.
   `;
 
   try {
@@ -225,7 +225,7 @@ export const generatePartyStory = async (base64Images: string[], customPrompt: s
     2. برای هر عکس، شخصیت‌ها و نقششان را در داستان مشخص کن.
     3. یک پاراگراف داستان طنز (به فارسی) برای هر عکس بنویس.
     4. داستان باید از عکس 1 به عکس 2 و ... به صورت پیوسته جریان داشته باشد.
-    5. حیاتی: حتماً محیط و پس‌زمینه هر عکس را به شکلی خنده‌دار در داستان توصیف کن (مثلاً شلوغی اتاق را به "میدان جنگ" تشبیه کن).
+    5. اگر در پس‌زمینه چیز جالبی دیدی، حتما در داستان به آن اشاره کن.
     
     خروجی JSON:
     {
