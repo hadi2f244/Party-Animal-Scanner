@@ -39,12 +39,27 @@ async function decodeAudioData(
   return buffer;
 }
 
+const getSupportedMimeType = () => {
+  if (typeof MediaRecorder === 'undefined') return '';
+  const types = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm',
+    'video/mp4'
+  ];
+  for (const type of types) {
+    if (MediaRecorder.isTypeSupported(type)) return type;
+  }
+  return '';
+};
+
 export const StoryPlayer: React.FC<StoryPlayerProps> = ({ images, story, onClose }) => {
   const [pageIndex, setPageIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingReady, setRecordingReady] = useState(false);
+  const [imagesReady, setImagesReady] = useState(false);
   
   // Refs for stable access inside animation loop
   const activePageIndexRef = useRef(0); 
@@ -62,21 +77,33 @@ export const StoryPlayer: React.FC<StoryPlayerProps> = ({ images, story, onClose
   
   const animationFrameRef = useRef<number>(0);
 
-  // Preload Images
+  // 1. Preload Images
   useEffect(() => {
+    let isMounted = true;
+    setImagesReady(false);
+
     const loadImages = async () => {
         const loadedImages: HTMLImageElement[] = [];
+        // Load sequentially to ensure order matches story pages
         for (const src of images) {
             await new Promise<void>((resolve) => {
                 const img = new Image();
-                img.onload = () => { loadedImages.push(img); resolve(); };
+                img.onload = () => resolve();
+                img.onerror = () => resolve(); // Continue even on error
                 img.src = src;
+                loadedImages.push(img);
             });
         }
-        imageCacheRef.current = loadedImages;
+        
+        if (isMounted) {
+            imageCacheRef.current = loadedImages;
+            setImagesReady(true);
+        }
     };
+
     loadImages();
 
+    // Initialize Audio Context
     if (!audioContextRef.current) {
         const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
         audioContextRef.current = ctx;
@@ -84,6 +111,7 @@ export const StoryPlayer: React.FC<StoryPlayerProps> = ({ images, story, onClose
     }
 
     return () => {
+      isMounted = false;
       isMountedRef.current = false;
       stopAudio();
       cancelAnimationFrame(animationFrameRef.current);
@@ -92,6 +120,14 @@ export const StoryPlayer: React.FC<StoryPlayerProps> = ({ images, story, onClose
       }
     };
   }, [images]);
+
+  // 2. Auto-Start Playback ONLY when images are ready
+  useEffect(() => {
+    if (imagesReady) {
+        playSequence(0, false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imagesReady]);
 
   const stopAudio = () => {
     if (sourceRef.current) {
@@ -102,7 +138,14 @@ export const StoryPlayer: React.FC<StoryPlayerProps> = ({ images, story, onClose
 
   // --- Rendering Logic ---
   const drawFrame = (timestamp: number) => {
-      if (!canvasRef.current || imageCacheRef.current.length === 0) return;
+      if (!canvasRef.current) return;
+      
+      // CRITICAL FIX: If images aren't ready yet, don't stop the loop!
+      // Just request next frame and wait.
+      if (imageCacheRef.current.length === 0) {
+          animationFrameRef.current = requestAnimationFrame(drawFrame);
+          return;
+      }
       
       const ctx = canvasRef.current.getContext('2d');
       if (!ctx) return;
@@ -114,7 +157,12 @@ export const StoryPlayer: React.FC<StoryPlayerProps> = ({ images, story, onClose
       
       // Fallback to index 0 if image not found
       const img = imageCacheRef.current[imageIndex] || imageCacheRef.current[0];
-      if (!img) return;
+      
+      // If specific image is missing, skip this frame but keep loop alive
+      if (!img) {
+          animationFrameRef.current = requestAnimationFrame(drawFrame);
+          return;
+      }
 
       // Much slower zoom effect
       const zoomSpeed = 0.00005; 
@@ -132,18 +180,21 @@ export const StoryPlayer: React.FC<StoryPlayerProps> = ({ images, story, onClose
 
       const iw = img.width;
       const ih = img.height;
-      const ratio = Math.max(canvasWidth / iw, canvasHeight / ih);
       
-      // Calculate centered position
-      const centerShift_x = (canvasWidth - iw * ratio) / 2;
-      const centerShift_y = (canvasHeight - ih * ratio) / 2;
+      if (iw > 0 && ih > 0) {
+        const ratio = Math.max(canvasWidth / iw, canvasHeight / ih);
+        
+        // Calculate centered position
+        const centerShift_x = (canvasWidth - iw * ratio) / 2;
+        const centerShift_y = (canvasHeight - ih * ratio) / 2;
 
-      ctx.save();
-      ctx.translate(canvasWidth / 2, canvasHeight / 2);
-      ctx.scale(scale, scale);
-      ctx.translate(-canvasWidth / 2, -canvasHeight / 2);
-      ctx.drawImage(img, 0, 0, iw, ih, centerShift_x, centerShift_y, iw * ratio, ih * ratio);
-      ctx.restore();
+        ctx.save();
+        ctx.translate(canvasWidth / 2, canvasHeight / 2);
+        ctx.scale(scale, scale);
+        ctx.translate(-canvasWidth / 2, -canvasHeight / 2);
+        ctx.drawImage(img, 0, 0, iw, ih, centerShift_x, centerShift_y, iw * ratio, ih * ratio);
+        ctx.restore();
+      }
 
       // Gradient Overlay
       const gradient = ctx.createLinearGradient(0, canvasHeight * 0.5, 0, canvasHeight);
@@ -221,9 +272,17 @@ export const StoryPlayer: React.FC<StoryPlayerProps> = ({ images, story, onClose
             ...audioStream.getAudioTracks()
         ]);
         
+        const mimeType = getSupportedMimeType();
+        if (!mimeType) {
+             alert('مرورگر شما از ضبط پشتیبانی نمی‌کند');
+             setIsRecording(false);
+             setIsPlaying(false);
+             return;
+        }
+
         recordedChunksRef.current = [];
         const recorder = new MediaRecorder(combinedStream, {
-            mimeType: 'video/webm;codecs=vp9,opus',
+            mimeType: mimeType,
             videoBitsPerSecond: 2500000 // 2.5 Mbps
         });
         
@@ -316,20 +375,15 @@ export const StoryPlayer: React.FC<StoryPlayerProps> = ({ images, story, onClose
 
   const handleDownloadVideo = () => {
       if (recordedChunksRef.current.length === 0) return;
-      const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+      const mimeType = getSupportedMimeType();
+      const blob = new Blob(recordedChunksRef.current, { type: mimeType });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `ravayatgar-story-${Date.now()}.webm`;
+      a.download = `ravayatgar-story-${Date.now()}.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`;
       a.click();
       URL.revokeObjectURL(url);
   };
-
-  // Auto-start preview
-  useEffect(() => {
-    playSequence(0, false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleNext = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -361,12 +415,19 @@ export const StoryPlayer: React.FC<StoryPlayerProps> = ({ images, story, onClose
     <div className="fixed inset-0 z-50 bg-black flex flex-col animate-fade-in font-vazir select-none">
       
       <div className="relative flex-1 w-full overflow-hidden bg-black flex items-center justify-center">
-          <canvas 
-            ref={canvasRef} 
-            width={720} 
-            height={1280} 
-            className="h-full w-full object-contain"
-          />
+          {imagesReady ? (
+              <canvas 
+                ref={canvasRef} 
+                width={720} 
+                height={1280} 
+                className="h-full w-full object-contain"
+              />
+          ) : (
+              <div className="flex flex-col items-center justify-center text-white space-y-4">
+                  <Loader2 className="w-12 h-12 animate-spin text-purple-500" />
+                  <p>در حال آماده‌سازی تصاویر...</p>
+              </div>
+          )}
       </div>
 
       <div className="absolute inset-0 z-10 flex">

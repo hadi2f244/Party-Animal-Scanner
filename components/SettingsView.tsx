@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { AppSettings, DEFAULT_SETTINGS, GameTheme } from '../types';
-import { Save, RotateCcw, X, Settings as SettingsIcon, CheckCircle2, Edit3, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { AppSettings, DEFAULT_SETTINGS, GameTheme, StoryFocusMode } from '../types';
+import { Save, RotateCcw, X, Settings as SettingsIcon, CheckCircle2, Edit3, Plus, Trash2, ChevronDown, ChevronUp, User, Armchair } from 'lucide-react';
 
 interface SettingsViewProps {
   currentSettings: AppSettings;
@@ -93,8 +93,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setNewThemeDesc('');
   };
 
+  const handleFocusChange = (mode: StoryFocusMode) => {
+      handleChange('storyFocusMode', mode);
+  };
+
   // Filter themes for display
-  // Show first 6 + selected + custom, hide others behind "Show More"
   const displayedThemes = showAllThemes 
     ? availableThemes 
     : availableThemes.slice(0, 6).concat(availableThemes.filter(t => t.isCustom || t.id === settings.selectedThemeId).filter(t => !availableThemes.slice(0,6).includes(t)));
@@ -118,6 +121,42 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6 pt-20 space-y-8 no-scrollbar pb-28">
         
+        {/* Story Focus Settings */}
+        <div className="space-y-3">
+             <label className="block text-green-300 font-bold text-lg mb-2">
+                تمرکز روایت و داستان
+            </label>
+            <div className="flex bg-gray-900 p-1 rounded-xl border border-gray-700">
+                <button 
+                    onClick={() => handleFocusChange('people_only')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg transition-all ${
+                        settings.storyFocusMode === 'people_only'
+                        ? 'bg-green-600 text-white shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                >
+                    <User size={18} />
+                    <span>فقط شخصیت‌ها</span>
+                </button>
+                <button 
+                    onClick={() => handleFocusChange('mixed_env')}
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg transition-all ${
+                        settings.storyFocusMode === 'mixed_env'
+                        ? 'bg-green-600 text-white shadow-md'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                >
+                    <Armchair size={18} />
+                    <span>ترکیب محیط و اشیاء</span>
+                </button>
+            </div>
+            <p className="text-xs text-gray-400 pr-2">
+                در حالت "ترکیب محیط"، راوی علاوه بر افراد، به اسباب و اثاثیه، به هم ریختگی و جزئیات پس‌زمینه هم گیر می‌دهد!
+            </p>
+        </div>
+
+        <div className="w-full h-px bg-gray-800 my-2"></div>
+
         {/* Theme Selection */}
         <div className="space-y-4">
             <div className="flex items-center justify-between">

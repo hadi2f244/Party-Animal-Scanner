@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Camera, Upload, Sparkles, PartyPopper, CheckCircle2, Circle, ArrowLeft, BookOpen, Clock, Loader2, Settings } from 'lucide-react';
-import { analyzeCharacter, detectPeopleInImage, generatePartyStory, generateRoastAudio } from './services/geminiService';
+import { Camera, Sparkles, PartyPopper, CheckCircle2, Circle, ArrowLeft, BookOpen, Clock, Settings, Armchair } from 'lucide-react';
+import { analyzeCharacter, analyzeScene, detectPeopleInImage, generatePartyStory, generateRoastAudio } from './services/geminiService';
 import { CameraView } from './components/CameraView';
 import { ResultCard } from './components/ResultCard';
 import { StoryPlayer } from './components/StoryPlayer';
@@ -27,10 +27,13 @@ export const App: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [customThemes, setCustomThemes] = useState<GameTheme[]>([]);
 
+  // Flag to know if we are doing scene analysis (to route the camera capture)
+  const [isSceneMode, setIsSceneMode] = useState(false);
+
   // Load settings and themes from local storage on mount
   useEffect(() => {
     // Load Settings
-    const savedSettings = localStorage.getItem('partyApp_settings_v7');
+    const savedSettings = localStorage.getItem('partyApp_settings_v8');
     if (savedSettings) {
         try {
             const parsed = JSON.parse(savedSettings);
@@ -54,7 +57,7 @@ export const App: React.FC = () => {
 
   const saveSettings = (newSettings: AppSettings) => {
       setSettings(newSettings);
-      localStorage.setItem('partyApp_settings_v7', JSON.stringify(newSettings));
+      localStorage.setItem('partyApp_settings_v8', JSON.stringify(newSettings));
       setAppState(AppState.HOME);
   };
 
@@ -90,8 +93,23 @@ export const App: React.FC = () => {
   const handleImageSelected = async (src: string) => {
     setImageSrc(src);
     setAppState(AppState.LOADING);
-    setLoadingMessage("در حال شناسایی افراد...");
     
+    if (isSceneMode) {
+        // Direct Scene Analysis
+        setLoadingMessage("در حال بررسی محیط و اشیاء...");
+        try {
+            const analysisResult = await analyzeScene(src, settings.analysisPrompt);
+            setResult(analysisResult);
+            setAppState(AppState.RESULT);
+        } catch (error) {
+            console.error(error);
+            setAppState(AppState.ERROR);
+        }
+        return;
+    }
+
+    // Normal Character Analysis Flow
+    setLoadingMessage("در حال شناسایی افراد...");
     try {
       const people = await detectPeopleInImage(src);
       
@@ -187,7 +205,7 @@ export const App: React.FC = () => {
     });
 
     try {
-        const story = await generatePartyStory(images, settings.storyPrompt);
+        const story = await generatePartyStory(images, settings.storyPrompt, settings.storyFocusMode);
         updateProgress("سناریو نوشته شد! در حال ضبط صدا...");
 
         const pagesWithAudio = [];
@@ -226,55 +244,6 @@ export const App: React.FC = () => {
       return await generateRoastAudio(text, settings.ttsStylePrompt, settings.voiceName);
   }
 
-  const resizeImage = (file: File): Promise<string> => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_SIZE = 800;
-          let w = img.width;
-          let h = img.height;
-          
-          if (w > h) {
-            if (w > MAX_SIZE) {
-              h = Math.round(h * (MAX_SIZE / w));
-              w = MAX_SIZE;
-            }
-          } else {
-            if (h > MAX_SIZE) {
-              w = Math.round(w * (MAX_SIZE / h));
-              h = MAX_SIZE;
-            }
-          }
-          
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-              ctx.drawImage(img, 0, 0, w, h);
-              resolve(canvas.toDataURL('image/jpeg', 0.6));
-          }
-        };
-        img.src = e.target?.result as string;
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-        try {
-            const resizedImage = await resizeImage(file);
-            handleImageSelected(resizedImage);
-        } catch (e) {
-            console.error("Error processing image", e);
-        }
-    }
-  };
-
   const resetApp = () => {
     setAppState(AppState.HOME);
     setImageSrc('');
@@ -283,6 +252,7 @@ export const App: React.FC = () => {
     setStoryImages([]);
     setStoryResult(null);
     setLoadingProgress(null);
+    setIsSceneMode(false);
   };
 
   // Combine default and custom themes
@@ -294,16 +264,8 @@ export const App: React.FC = () => {
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-700/30 rounded-full blur-[120px] pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-pink-700/20 rounded-full blur-[120px] pointer-events-none"></div>
 
-      <input 
-        type="file" 
-        id="file-upload"
-        accept="image/*" 
-        className="hidden" 
-        onChange={handleFileUpload}
-      />
-
       {appState === AppState.HOME && (
-        <div className="w-full max-w-md flex flex-col items-center justify-center min-h-[80vh] space-y-8 animate-fade-in relative">
+        <div className="w-full max-w-md flex flex-col items-center justify-center min-h-[80vh] space-y-6 animate-fade-in relative">
             <button 
                 onClick={() => setAppState(AppState.SETTINGS)}
                 className="absolute top-0 right-0 p-3 bg-white/10 hover:bg-white/20 rounded-full text-gray-300 hover:text-white transition backdrop-blur-sm z-10"
@@ -311,7 +273,7 @@ export const App: React.FC = () => {
                 <Settings className="w-6 h-6" />
             </button>
 
-            <div className="text-center space-y-4">
+            <div className="text-center space-y-4 pt-10">
                 <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-gradient-to-tr from-yellow-400 to-orange-500 shadow-lg shadow-orange-500/20 mb-4 transform rotate-12">
                     <PartyPopper className="w-10 h-10 text-white" />
                 </div>
@@ -334,7 +296,7 @@ export const App: React.FC = () => {
 
             <div className="w-full space-y-4">
                 <button 
-                    onClick={() => setAppState(AppState.CAMERA)}
+                    onClick={() => { setIsSceneMode(false); setAppState(AppState.CAMERA); }}
                     className="w-full group flex items-center justify-between p-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 transition-all duration-200 transform hover:scale-[1.02] shadow-xl shadow-blue-900/30"
                 >
                     <div className="text-right">
@@ -343,6 +305,19 @@ export const App: React.FC = () => {
                     </div>
                     <div className="bg-white/20 p-3 rounded-full">
                         <Camera className="w-8 h-8 text-white" />
+                    </div>
+                </button>
+
+                <button 
+                    onClick={() => { setIsSceneMode(true); setAppState(AppState.CAMERA); }}
+                    className="w-full group flex items-center justify-between p-6 rounded-2xl bg-gradient-to-r from-teal-600 to-green-600 hover:from-teal-500 hover:to-green-500 transition-all duration-200 transform hover:scale-[1.02] shadow-xl shadow-teal-900/30"
+                >
+                    <div className="text-right">
+                        <span className="block text-xl font-bold">تحلیل محیط و اشیاء</span>
+                        <span className="text-teal-200 text-sm">دکوراسیون و اتمسفر رو بسنج!</span>
+                    </div>
+                    <div className="bg-white/20 p-3 rounded-full">
+                        <Armchair className="w-8 h-8 text-white" />
                     </div>
                 </button>
 
@@ -357,14 +332,6 @@ export const App: React.FC = () => {
                     <div className="bg-white/20 p-3 rounded-full">
                         <BookOpen className="w-8 h-8 text-white" />
                     </div>
-                </button>
-                
-                <button 
-                    onClick={() => document.getElementById('file-upload')?.click()}
-                    className="w-full flex items-center justify-center gap-3 p-4 rounded-2xl bg-gray-800 hover:bg-gray-700 transition-colors border border-gray-700"
-                >
-                    <Upload className="w-5 h-5 text-gray-400" />
-                    <span className="font-semibold text-gray-300">آپلود از گالری</span>
                 </button>
             </div>
         </div>

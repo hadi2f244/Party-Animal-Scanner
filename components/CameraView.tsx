@@ -15,7 +15,8 @@ export const CameraView: React.FC<CameraViewProps> = ({ onCapture, onClose, mult
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  // Default to 'environment' (back camera) instead of 'user'
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const [error, setError] = useState<string>('');
   const [retryTrigger, setRetryTrigger] = useState(0);
   

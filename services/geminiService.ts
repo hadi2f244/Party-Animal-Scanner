@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, Type, Modality, GenerateContentResponse } from "@google/genai";
-import { AnalysisResult, PersonDetected, StoryResult } from "../types";
+import { AnalysisResult, PersonDetected, StoryResult, StoryFocusMode } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -10,7 +11,7 @@ const retry = async <T>(fn: () => Promise<T>, retries = 2): Promise<T> => {
   } catch (e) {
     if (retries > 0) {
       console.warn(`API Call Failed. Retrying... Attempts left: ${retries}`, e);
-      await new Promise(r => setTimeout(r, 1500)); // Increased wait time slightly
+      await new Promise(r => setTimeout(r, 1500)); 
       return retry(fn, retries - 1);
     }
     throw e;
@@ -74,6 +75,73 @@ export const detectPeopleInImage = async (base64Image: string): Promise<PersonDe
   }
 };
 
+export const analyzeScene = async (base64Image: string, customPrompt: string): Promise<AnalysisResult> => {
+  const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
+  
+  // Extract the ROLE from the custom prompt to maintain the Persona, but override the task.
+  let prompt = `${customPrompt}`;
+  
+  prompt += `
+  \nGLOBAL DIRECTIVE FOR SCENE ANALYSIS:
+  1. TASK: Ignore instructions to focus on a specific person. Instead, analyze the ENTIRE SCENE (The room, the objects, the mess, the decor, AND the people).
+  2. TONE: You are still a ROAST COMEDIAN in the character defined above. Roast the ENVIRONMENT.
+  3. LANGUAGE: Output JSON values in PERSIAN (FARSI).
+  4. OBSERVATION: Find funny details in the background (e.g. "Ugly curtains", "Cheap furniture", "Dirty plates").
+  
+  Return strictly valid JSON with this schema:`;
+
+  try {
+    const response = await retry<GenerateContentResponse>(() => ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: 'image/jpeg',
+              data: cleanBase64
+            }
+          },
+          { text: prompt }
+        ]
+      },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            characterTitle: {
+              type: Type.STRING,
+              description: "Funny Title for the Scene/Location in Persian",
+            },
+            emoji: {
+              type: Type.STRING,
+              description: "Relevant emojis for the environment/objects",
+            },
+            description: {
+              type: Type.STRING,
+              description: "Creative roast description of the room, objects, and overall vibe in Persian.",
+            },
+            subtitle: {
+              type: Type.STRING,
+              description: "Short funny subtitle for the atmosphere in Persian",
+            }
+          },
+          required: ["characterTitle", "emoji", "description", "subtitle"],
+        },
+      },
+    }));
+
+    const text = response.text;
+    if (!text) throw new Error("No response text from Gemini");
+    
+    return JSON.parse(text) as AnalysisResult;
+
+  } catch (error) {
+    console.error("Gemini Scene Analysis Failed:", error);
+    throw error;
+  }
+};
+
 export const analyzeCharacter = async (base64Image: string, focusOn: string[], customPrompt: string): Promise<AnalysisResult> => {
   // Clean the base64 string if it has the header
   const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
@@ -89,18 +157,30 @@ export const analyzeCharacter = async (base64Image: string, focusOn: string[], c
   3. CONTENT: Make fun of the person's face, pose, clothes, or vibe. Use funny metaphors.
   `;
 
-  if (focusOn.length > 0) {
+  // Improved Logic for Single vs Multi-Person Analysis
+  if (focusOn.length > 1) {
+    prompt += `
+    
+    FOCUS INSTRUCTION (MULTI-PERSON MODE):
+    You have selected ${focusOn.length} specific people: [ ${focusOn.join(" AND ")} ].
+    
+    CRITICAL RULES FOR GROUPS:
+    1. SYNTHESIS: You MUST describe/roast ALL selected people in the 'description'. Name them if possible (e.g. "The one on the left... while the one on the right...").
+    2. TITLE: Create a collective plural title for the group (e.g., "The Partners in Crime", "Dumb & Dumber", "The Lost Tourists").
+    3. DYNAMIC: Comment on how they look *together* or interact (e.g., "One looks confused, while the other is trying too hard").
+    4. ROAST: Roast them as a team. Do NOT ignore any selected person.
+    `;
+  } else if (focusOn.length === 1) {
     prompt += `
     
     FOCUS INSTRUCTION:
-    Analyze ONLY the people matching these descriptions: ${focusOn.join(", ")}.
-    Ignore other background people.
-    If multiple people are selected, create a group title/description.`;
+    Analyze ONLY the person matching this description: ${focusOn[0]}.
+    Ignore other people in the background unless they are doing something hilarious.`;
   } else {
     prompt += `
     
     FOCUS INSTRUCTION:
-    Analyze the main subject(s) of the photo.`;
+    Analyze the main subject(s) of the photo. If multiple people are central, roast them as a group.`;
   }
 
   prompt += `
@@ -127,15 +207,15 @@ export const analyzeCharacter = async (base64Image: string, focusOn: string[], c
           properties: {
             characterTitle: {
               type: Type.STRING,
-              description: "Funny/Roast character title in Persian",
+              description: "Funny/Roast character title (or Group Title) in Persian",
             },
             emoji: {
               type: Type.STRING,
-              description: "Relevant emojis",
+              description: "Relevant emojis (multiple if group)",
             },
             description: {
               type: Type.STRING,
-              description: "Creative roast description in Persian (max 3 sentences)",
+              description: "Creative roast description in Persian. MUST cover all selected people if a group.",
             },
             subtitle: {
               type: Type.STRING,
@@ -159,13 +239,17 @@ export const analyzeCharacter = async (base64Image: string, focusOn: string[], c
 };
 
 export const generateRoastAudio = async (text: string, stylePrompt: string, voiceName: string = 'Kore'): Promise<string> => {
-  // Simplified prompt to prevent TTS model confusion
-  // We just ask it to read the text with the requested style/tone
+  // STRICT Prompt to prevent the model from reading instructions
   const prompt = `
-  Read the following text in Persian.
-  Tone: ${stylePrompt}
+  TASK: You are a professional voice actor.
+  INSTRUCTION: Read the provided text below in Persian (Farsi).
   
-  Text:
+  STYLE RULES:
+  1. Voice Tone: ${stylePrompt}
+  2. ACTION: Start with a 3-second vocal sound effect (like a drum roll, heavy breathing, jazz scat, or dramatic gasp) fitting the tone, THEN read the text.
+  3. RESTRICTION: Do NOT read any labels like "Title:" or "Description:". Do NOT say "Here is the audio". Just perform.
+  
+  TEXT TO READ:
   "${text}"
   `;
 
@@ -183,7 +267,6 @@ export const generateRoastAudio = async (text: string, stylePrompt: string, voic
       },
     }));
 
-    // Robustly check for audio data in all parts
     const parts = response.candidates?.[0]?.content?.parts;
     if (!parts || parts.length === 0) {
         throw new Error("Empty response from TTS model");
@@ -195,7 +278,6 @@ export const generateRoastAudio = async (text: string, stylePrompt: string, voic
         return audioPart.inlineData.data;
     }
     
-    // Check for text error response (model refusal or confusion)
     const textPart = parts.find(p => p.text);
     if (textPart && textPart.text) {
         console.warn("TTS Error (Model returned text):", textPart.text);
@@ -209,7 +291,7 @@ export const generateRoastAudio = async (text: string, stylePrompt: string, voic
   }
 };
 
-export const generatePartyStory = async (base64Images: string[], customPrompt: string): Promise<StoryResult> => {
+export const generatePartyStory = async (base64Images: string[], customPrompt: string, focusMode: StoryFocusMode = 'mixed_env'): Promise<StoryResult> => {
   const parts: any[] = [];
   
   base64Images.forEach(img => {
@@ -222,14 +304,29 @@ export const generatePartyStory = async (base64Images: string[], customPrompt: s
     });
   });
 
+  let pageLimitInstruction = "";
+  if (base64Images.length === 1) {
+      pageLimitInstruction = "RESTRICTION: Since there is only 1 image, create ONLY 1 story page. Do not repeat the image multiple times.";
+  }
+
+  // Focus Mode Instruction
+  let focusInstruction = "";
+  if (focusMode === 'people_only') {
+      focusInstruction = "STORY FOCUS: Focus strictly on the PEOPLE, their expressions, dialogue, and actions. Ignore inanimate objects unless necessary.";
+  } else {
+      focusInstruction = "STORY FOCUS: You MUST incorporate the ENVIRONMENT, OBJECTS, and BACKGROUND into the plot. Roast the furniture, the walls, and the mess as much as the people.";
+  }
+
   const prompt = `
     ${customPrompt}
     
     GLOBAL STORY RULES:
-    1. TONE: Heavy Roast & Comedy. Make fun of the people in the photos.
+    1. TONE: Heavy Roast & Comedy.
     2. LANGUAGE: Output MUST be in Persian (Farsi).
     3. LOGIC: Link the photos into a funny, disastrous narrative.
     4. FORMAT: Valid JSON.
+    ${focusInstruction}
+    ${pageLimitInstruction}
     
     JSON Structure:
     {

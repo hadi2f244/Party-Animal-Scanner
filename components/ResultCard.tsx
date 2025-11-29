@@ -40,6 +40,20 @@ async function decodeAudioData(
   return buffer;
 }
 
+const getSupportedMimeType = () => {
+  if (typeof MediaRecorder === 'undefined') return '';
+  const types = [
+    'video/webm;codecs=vp9,opus',
+    'video/webm;codecs=vp8,opus',
+    'video/webm',
+    'video/mp4'
+  ];
+  for (const type of types) {
+    if (MediaRecorder.isTypeSupported(type)) return type;
+  }
+  return '';
+};
+
 export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onReset, customAudioGenerator }) => {
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -70,6 +84,8 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
      
      setIsLoadingAudio(true);
      try {
+        // We only send the text content. The prompt instruction in geminiService handles the "Title" reading logic.
+        // We send Title + \n\n + Description.
         const textToRead = `${result.characterTitle}\n\n${result.description}`;
         const base64 = await customAudioGenerator(textToRead);
         setAudioBase64Cache(base64);
@@ -130,13 +146,48 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
   const handleDownloadAudio = async () => {
       try {
           const base64 = await generateAudio();
+          // Create a WAV header for compatibility
+          const audioBytes = decode(base64);
+          const wavBytes = new Uint8Array(44 + audioBytes.length);
+          const view = new DataView(wavBytes.buffer);
+          
+          // RIFF chunk descriptor
+          writeString(view, 0, 'RIFF');
+          view.setUint32(4, 36 + audioBytes.length, true);
+          writeString(view, 8, 'WAVE');
+          // fmt sub-chunk
+          writeString(view, 12, 'fmt ');
+          view.setUint32(16, 16, true);
+          view.setUint16(20, 1, true); // PCM
+          view.setUint16(22, 1, true); // Mono
+          view.setUint32(24, 24000, true); // Sample rate
+          view.setUint32(28, 24000 * 2, true); // Byte rate
+          view.setUint16(32, 2, true); // Block align
+          view.setUint16(34, 16, true); // Bits per sample
+          // data sub-chunk
+          writeString(view, 36, 'data');
+          view.setUint32(40, audioBytes.length, true);
+          
+          // Write PCM data (assuming 16-bit input which it is)
+          wavBytes.set(audioBytes, 44);
+
+          const blob = new Blob([wavBytes], { type: 'audio/wav' });
+          const url = URL.createObjectURL(blob);
+          
           const link = document.createElement('a');
-          link.href = `data:audio/wav;base64,${base64}`;
+          link.href = url;
           link.download = `ravayatgar-${Date.now()}.wav`;
           link.click();
+          URL.revokeObjectURL(url);
       } catch (e) {
           alert('خطا در دانلود صدا');
       }
+  };
+  
+  const writeString = (view: DataView, offset: number, string: string) => {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
   };
 
   const handleSaveImage = async () => {
@@ -154,6 +205,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
               backgroundColor: '#111827',
               scale: 2,
               useCORS: true,
+              logging: false,
           });
 
           const link = document.createElement('a');
@@ -191,8 +243,14 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
 
         // 2. Prepare Image
         const img = new Image();
+        img.crossOrigin = "anonymous"; // Important for canvas export
         img.src = imageSrc;
-        await new Promise((resolve) => { img.onload = resolve; });
+        await new Promise((resolve, reject) => { 
+            img.onload = resolve; 
+            img.onerror = () => resolve(null); // Proceed anyway if image fails to load fully
+            // Safety timeout for image load
+            setTimeout(resolve, 3000); 
+        });
 
         // 3. Get Audio Buffer
         const base64Audio = await generateAudio();
@@ -205,24 +263,45 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
         canvas.height = 1280;
         const ctx = canvas.getContext('2d')!;
 
-        // 5. Setup MediaRecorder
+        // 5. Setup MediaRecorder with robust mimeType
         const canvasStream = canvas.captureStream(30);
         const audioStream = destinationNodeRef.current.stream;
         const combinedStream = new MediaStream([...canvasStream.getVideoTracks(), ...audioStream.getAudioTracks()]);
         
+        const mimeType = getSupportedMimeType();
+        if (!mimeType) {
+            throw new Error("مرورگر شما از ضبط ویدیو پشتیبانی نمی‌کند");
+        }
+
         const chunks: Blob[] = [];
         const recorder = new MediaRecorder(combinedStream, {
-             mimeType: 'video/webm;codecs=vp9,opus',
+             mimeType: mimeType,
              videoBitsPerSecond: 2500000
         });
         
         recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
         
+        // Use a Promise to wait for the onstop event to ensure we don't miss it
+        const recordingFinished = new Promise<void>(resolve => {
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: mimeType });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `ravayatgar-video-${Date.now()}.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`;
+                a.click();
+                URL.revokeObjectURL(url);
+                resolve();
+            };
+        });
+        
         // 6. Animation Loop (Ken Burns + Text)
         const startTime = performance.now();
         let animationId: number;
+        let isVideoRunning = true;
 
         const drawFrame = () => {
+            if (!isVideoRunning) return;
             const elapsed = performance.now() - startTime;
             const scale = 1.0 + (elapsed * 0.00005); // Slow Zoom
             
@@ -231,18 +310,20 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // Draw Image
-            const iw = img.width;
-            const ih = img.height;
-            const ratio = Math.max(canvas.width / iw, canvas.height / ih);
-            const cx = (canvas.width - iw * ratio) / 2;
-            const cy = (canvas.height - ih * ratio) / 2;
+            if (img.complete && img.naturalWidth > 0) {
+                const iw = img.width;
+                const ih = img.height;
+                const ratio = Math.max(canvas.width / iw, canvas.height / ih);
+                const cx = (canvas.width - iw * ratio) / 2;
+                const cy = (canvas.height - ih * ratio) / 2;
 
-            ctx.save();
-            ctx.translate(canvas.width / 2, canvas.height / 2);
-            ctx.scale(scale, scale);
-            ctx.translate(-canvas.width / 2, -canvas.height / 2);
-            ctx.drawImage(img, 0, 0, iw, ih, cx, cy, iw * ratio, ih * ratio);
-            ctx.restore();
+                ctx.save();
+                ctx.translate(canvas.width / 2, canvas.height / 2);
+                ctx.scale(scale, scale);
+                ctx.translate(-canvas.width / 2, -canvas.height / 2);
+                ctx.drawImage(img, 0, 0, iw, ih, cx, cy, iw * ratio, ih * ratio);
+                ctx.restore();
+            }
 
             // Draw Text Overlay
             const gradient = ctx.createLinearGradient(0, canvas.height * 0.5, 0, canvas.height);
@@ -293,39 +374,39 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
         const source = audioContextRef.current.createBufferSource();
         source.buffer = audioBuffer;
         source.connect(destinationNodeRef.current); // To recorder
+        source.connect(audioContextRef.current.destination); // Also to speakers for feedback
         
-        // Optional: connect to speakers if you want to hear it while recording (muted for performance usually)
-        // source.connect(audioContextRef.current.destination); 
-
         recorder.start();
         source.start();
         drawFrame();
 
+        // Safety timeout in case onended doesn't fire
+        const safetyTimeout = setTimeout(() => {
+            if (isVideoRunning) {
+                console.warn("Forcing video stop due to timeout");
+                source.stop();
+                if (recorder.state !== 'inactive') recorder.stop();
+                isVideoRunning = false;
+                cancelAnimationFrame(animationId);
+            }
+        }, (audioBuffer.duration * 1000) + 2000); // Duration + 2s buffer
+
         await new Promise<void>((resolve) => {
             source.onended = () => {
-                recorder.stop();
+                clearTimeout(safetyTimeout);
+                if (recorder.state !== 'inactive') recorder.stop();
+                isVideoRunning = false;
                 cancelAnimationFrame(animationId);
                 resolve();
             };
         });
 
-        // 8. Download
-        await new Promise<void>(resolve => {
-            recorder.onstop = () => {
-                const blob = new Blob(chunks, { type: 'video/webm' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `ravayatgar-video-${Date.now()}.webm`;
-                a.click();
-                URL.revokeObjectURL(url);
-                resolve();
-            };
-        });
+        // 8. Wait for Download to finish
+        await recordingFinished;
 
       } catch (e) {
           console.error(e);
-          alert("خطا در تولید ویدیو");
+          alert("خطا در تولید ویدیو. لطفا مرورگر خود را بررسی کنید.");
       } finally {
           setIsGeneratingVideo(false);
       }
