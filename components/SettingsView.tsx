@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AppSettings, DEFAULT_SETTINGS, GameTheme, StoryFocusMode, StoryLength } from '../types';
-import { Save, RotateCcw, X, Settings as SettingsIcon, CheckCircle2, Edit3, Plus, Trash2, ChevronDown, ChevronUp, User, Armchair, AlignJustify, AlignLeft, AlignCenter } from 'lucide-react';
+import { Save, RotateCcw, X, Settings as SettingsIcon, CheckCircle2, Edit3, Plus, Trash2, ChevronDown, ChevronUp, User, Armchair, AlignJustify, AlignLeft, AlignCenter, UserPlus } from 'lucide-react';
 
 interface SettingsViewProps {
   currentSettings: AppSettings;
@@ -134,8 +134,39 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 تنظیمات داستان و روایت
             </label>
             
+            {/* Ask For Name Toggle */}
+            <button 
+                onClick={() => handleChange('askUserForName', !settings.askUserForName)}
+                className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${
+                    settings.askUserForName 
+                    ? 'bg-blue-900/30 border-blue-500' 
+                    : 'bg-gray-900 border-gray-700'
+                }`}
+            >
+                <div className="flex items-center gap-3">
+                    <UserPlus className={`w-6 h-6 ${settings.askUserForName ? 'text-blue-400' : 'text-gray-500'}`} />
+                    <div className="text-right">
+                        <span className={`block font-bold ${settings.askUserForName ? 'text-white' : 'text-gray-400'}`}>
+                             پرسیدن نام افراد
+                        </span>
+                        <span className="text-xs text-gray-500">
+                             قبل از ساخت، اسم افراد توی عکس رو بپرس
+                        </span>
+                    </div>
+                </div>
+                {settings.askUserForName ? (
+                    <div className="w-12 h-6 bg-blue-500 rounded-full relative">
+                        <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full"></div>
+                    </div>
+                ) : (
+                    <div className="w-12 h-6 bg-gray-700 rounded-full relative">
+                        <div className="absolute right-1 top-1 w-4 h-4 bg-gray-500 rounded-full"></div>
+                    </div>
+                )}
+            </button>
+
             {/* Focus Toggle */}
-            <div className="flex bg-gray-900 p-1 rounded-xl border border-gray-700">
+            <div className="flex bg-gray-900 p-1 rounded-xl border border-gray-700 mt-4">
                 <button 
                     onClick={() => handleFocusChange('people_only')}
                     className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg transition-all ${

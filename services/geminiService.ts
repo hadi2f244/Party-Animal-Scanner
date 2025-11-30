@@ -143,7 +143,7 @@ export const analyzeScene = async (base64Image: string, customPrompt: string): P
   }
 };
 
-export const analyzeCharacter = async (base64Image: string, focusOn: string[], customPrompt: string): Promise<AnalysisResult> => {
+export const analyzeCharacter = async (base64Image: string, focusOn: string[], customPrompt: string, userNames?: string[]): Promise<AnalysisResult> => {
   // Clean the base64 string if it has the header
   const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
 
@@ -157,6 +157,13 @@ export const analyzeCharacter = async (base64Image: string, focusOn: string[], c
   2. LANGUAGE: The JSON output values MUST be in PERSIAN (FARSI).
   3. CONTENT: Make fun of the person's face, pose, clothes, or vibe. Use funny metaphors.
   `;
+
+  // Name handling logic
+  if (userNames && userNames.length > 0) {
+      prompt += `\nNAME INSTRUCTION: The user provided these names for the subjects: [ ${userNames.join(", ")} ]. You MUST use these names in your roast and title.`;
+  } else {
+      prompt += `\nNAME INSTRUCTION: The user did NOT provide names. STRICTLY DO NOT INVENT PROPER NAMES (like "Ali", "Sara"). Use generic titles or descriptions (e.g. "The Groom", "This Gentleman", "The Boss", "She") or pronouns.`;
+  }
 
   // Improved Logic for Single vs Multi-Person Analysis
   if (focusOn.length > 1) {
@@ -292,7 +299,7 @@ export const generateRoastAudio = async (text: string, stylePrompt: string, voic
   }
 };
 
-export const generatePartyStory = async (base64Images: string[], customPrompt: string, focusMode: StoryFocusMode = 'mixed_env', length: StoryLength = 'medium'): Promise<StoryResult> => {
+export const generatePartyStory = async (base64Images: string[], customPrompt: string, focusMode: StoryFocusMode = 'mixed_env', length: StoryLength = 'medium', userNames?: string[]): Promise<StoryResult> => {
   const parts: any[] = [];
   
   base64Images.forEach(img => {
@@ -331,6 +338,14 @@ export const generatePartyStory = async (base64Images: string[], customPrompt: s
       focusInstruction = "STORY FOCUS: You MUST incorporate the ENVIRONMENT, OBJECTS, and BACKGROUND into the plot. Roast the furniture, the walls, and the mess as much as the people.";
   }
 
+  // Name Instruction
+  let nameInstruction = "";
+  if (userNames && userNames.length > 0) {
+      nameInstruction = `NAME INSTRUCTION: The user provided these names for the characters: [ ${userNames.join(", ")} ]. Use these names in the story.`;
+  } else {
+      nameInstruction = `NAME INSTRUCTION: The user did NOT provide names. STRICTLY DO NOT INVENT PROPER NAMES (like "Ali", "Sara"). Refer to characters by their role or title (e.g. "The Driver", "The Host", "He/She").`;
+  }
+
   const prompt = `
     ${customPrompt}
     
@@ -341,6 +356,7 @@ export const generatePartyStory = async (base64Images: string[], customPrompt: s
     4. FORMAT: Valid JSON.
     ${focusInstruction}
     ${lengthInstruction}
+    ${nameInstruction}
     
     JSON Structure:
     {

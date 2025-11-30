@@ -28,6 +28,7 @@ export enum AppState {
   CAMERA = 'CAMERA',
   LOADING = 'LOADING',
   SELECTION = 'SELECTION',
+  NAME_INPUT = 'NAME_INPUT',
   RESULT = 'RESULT',
   ERROR = 'ERROR',
   STORY_CAPTURE = 'STORY_CAPTURE',
@@ -94,6 +95,42 @@ export const GAME_THEMES: GameTheme[] = [
     - Tone: Scientific mockery.
     OUTPUT LANGUAGE: Persian (Farsi).`,
     ttsStylePrompt: 'با صدای بسیار بم، عمیق، آرام و حماسی. دقیقاً مثل گوینده مستندهای نشنال جئوگرافیک.'
+  },
+  {
+    id: 'mafia',
+    label: 'مافیای پلاستیکی',
+    emoji: '🔫',
+    description: 'پدرخوانده‌ی نازی‌آباد',
+    voiceName: 'Charon',
+    analysisPrompt: `ROLE: You are the narrator of a classic Noir Mafia movie.
+    TASK: Analyze the person's physical features (eyes, hands, outfit) to prove they are a Ruthless Mafia Don (Godfather).
+    CRITICAL: Find the "Mafia Resemblance" in their face. Do NOT say they don't look like one.
+    - Eyes: "That cold stare... calculating the next hit."
+    - Hands: "Hands that have buried many secrets."
+    - Outfit/Pose: "A disguise of innocence to fool the police."
+    ROAST STRATEGY: Describe their ordinary or messy look as a sign of their supreme confidence and power. Be deadly serious.
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: A Noir Mafia Name (e.g. "Don Asghar the Eraser").
+    - subtitle: Rank (e.g. Capo di tutti capi).
+    - description: A serious noir monologue describing how their specific facial features betray their criminal genius.
+    ${COMMON_CONTEXT_INSTRUCTION}`,
+    scenePrompt: `ROLE: You are inspecting a Mafia Safe House / Headquarters.
+    TASK: Analyze the objects as tools of the trade.
+    CRITICAL: Everything is dangerous.
+    - Remote control: "The detonator."
+    - Glass of water: "Pure Vodka for the nerves."
+    - Messy room: "The aftermath of a struggle."
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: HQ Name.
+    - subtitle: Danger Level.
+    - description: Describe the scene as a crime scene or operation center.`,
+    storyPrompt: `A Noir Mafia Thriller script.
+    - Theme: A serious transaction or hit that is actually about something silly (like buying yogurt).
+    - Tone: Dark, brooding, cinematic.
+    OUTPUT LANGUAGE: Persian (Farsi).`,
+    ttsStylePrompt: 'با صدای بسیار پیر، لرزان، خش‌دار و خسته. مثل یک پدرخوانده‌ی ۸۰ ساله که به سختی نفس می‌کشد اما هنوز دستور قتل می‌دهد.'
   },
   {
     id: 'khastegari',
@@ -270,35 +307,6 @@ export const GAME_THEMES: GameTheme[] = [
     ttsStylePrompt: 'با صدایی آرام، کش‌دار، خسته، نالان و بسیار فلسفی. با مکث‌های طولانی.'
   },
   {
-    id: 'mafia',
-    label: 'مافیای پلاستیکی',
-    emoji: '🔫',
-    description: 'گادفادرِ نازی‌آباد',
-    voiceName: 'Charon',
-    analysisPrompt: `ROLE: You are The Godfather.
-    TASK: Roast this new recruit. They look like a school principal, not a gangster.
-    CRITICAL: Tell them they hold their phone like a water gun.
-    OUTPUT LANGUAGE: Persian (Farsi).
-    JSON FIELDS:
-    - characterTitle: Mob nickname (e.g. "Tony Donut").
-    - subtitle: Rank.
-    - description: Explain why they are a disgrace to the family.
-    ${COMMON_CONTEXT_INSTRUCTION}`,
-    scenePrompt: `ROLE: You are a Crime Scene Investigator or Mafia Boss checking a safehouse.
-    TASK: Analyze the room for security and style.
-    CRITICAL: Is this a good place for a hit? Roast the furniture for looking cheap/weak.
-    OUTPUT LANGUAGE: Persian (Farsi).
-    JSON FIELDS:
-    - characterTitle: Location Code Name.
-    - subtitle: Security Risk.
-    - description: Analyze the layout as a failed crime scene.`,
-    storyPrompt: `A failed mafia job.
-    - Theme: Scared of the dark during a heist.
-    - Tone: Aggressive, threatening, serious.
-    OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'با صدای خشن، گرفته، مرموز و تهدیدآمیز. مثل دون کورلئونه که آرام صحبت می‌کند.'
-  },
-  {
     id: 'vikings',
     label: 'وایکینگِ دریازده',
     emoji: '🪓',
@@ -367,6 +375,7 @@ export interface AppSettings {
   voiceName: string;
   storyFocusMode: StoryFocusMode;
   storyLength: StoryLength;
+  askUserForName: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -377,5 +386,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   selectedThemeId: GAME_THEMES[0].id,
   voiceName: GAME_THEMES[0].voiceName,
   storyFocusMode: 'mixed_env',
-  storyLength: 'medium'
+  storyLength: 'medium',
+  askUserForName: false
 };

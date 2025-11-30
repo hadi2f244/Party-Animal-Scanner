@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect } from 'react';
-import { Camera, Sparkles, PartyPopper, CheckCircle2, Circle, ArrowLeft, BookOpen, Clock, Settings, Armchair } from 'lucide-react';
+import { Camera, Sparkles, PartyPopper, CheckCircle2, Circle, ArrowLeft, BookOpen, Clock, Settings, Armchair, User } from 'lucide-react';
 import { analyzeCharacter, analyzeScene, detectPeopleInImage, generatePartyStory, generateRoastAudio } from './services/geminiService';
 import { CameraView } from './components/CameraView';
 import { ResultCard } from './components/ResultCard';
@@ -18,7 +18,11 @@ export const App: React.FC = () => {
   // Selection flow state
   const [detectedPeople, setDetectedPeople] = useState<PersonDetected[]>([]);
   const [selectedPeopleIds, setSelectedPeopleIds] = useState<Set<string>>(new Set());
+  const [personNames, setPersonNames] = useState<Record<string, string>>({});
 
+  // User provided names (Legacy/Story/Fallback)
+  const [userProvidedNames, setUserProvidedNames] = useState<string>('');
+  
   // Story Mode State
   const [storyImages, setStoryImages] = useState<string[]>([]);
   const [storyResult, setStoryResult] = useState<StoryResult | null>(null);
@@ -34,7 +38,7 @@ export const App: React.FC = () => {
   // Load settings and themes from local storage on mount
   useEffect(() => {
     // Load Settings
-    const savedSettings = localStorage.getItem('partyApp_settings_v11');
+    const savedSettings = localStorage.getItem('partyApp_settings_v13');
     if (savedSettings) {
         try {
             const parsed = JSON.parse(savedSettings);
@@ -58,7 +62,7 @@ export const App: React.FC = () => {
 
   const saveSettings = (newSettings: AppSettings) => {
       setSettings(newSettings);
-      localStorage.setItem('partyApp_settings_v11', JSON.stringify(newSettings));
+      localStorage.setItem('partyApp_settings_v13', JSON.stringify(newSettings));
       setAppState(AppState.HOME);
   };
 
@@ -94,6 +98,8 @@ export const App: React.FC = () => {
   const handleImageSelected = async (src: string) => {
     setImageSrc(src);
     setAppState(AppState.LOADING);
+    setUserProvidedNames('');
+    setPersonNames({}); // Reset per-person names
     
     if (isSceneMode) {
         // Direct Scene Analysis using the specific Scene Prompt
@@ -115,29 +121,49 @@ export const App: React.FC = () => {
       const people = await detectPeopleInImage(src);
       
       if (people.length === 0) {
-        runAnalysis(src, []); 
-      } else if (people.length === 1) {
-        runAnalysis(src, [people[0].label]);
+        // No detection, check if we need names
+        if (settings.askUserForName) {
+            setAppState(AppState.NAME_INPUT);
+        } else {
+            runAnalysis(src, []);
+        }
       } else {
+        // Whether 1 or multiple, if we need names OR multiple people, we go to SELECTION
         setDetectedPeople(people);
         setSelectedPeopleIds(new Set(people.map(p => p.id)));
-        setAppState(AppState.SELECTION);
+        
+        // If >1 person OR asking for names is enabled, show selection screen
+        if (people.length > 1 || settings.askUserForName) {
+            setAppState(AppState.SELECTION);
+        } else {
+            runAnalysis(src, [people[0].label]);
+        }
       }
     } catch (error) {
       console.error("Detection error", error);
-      runAnalysis(src, []);
+      if (settings.askUserForName) {
+          setAppState(AppState.NAME_INPUT);
+      } else {
+          runAnalysis(src, []);
+      }
     }
   };
 
-  const runAnalysis = async (src: string, focusLabels: string[]) => {
+  const runAnalysis = async (src: string, focusLabels: string[], names: string[] = []) => {
     setAppState(AppState.LOADING);
     const msgInterval = setInterval(() => {
         setLoadingMessage(funnyLoadingMessages[Math.floor(Math.random() * funnyLoadingMessages.length)]);
     }, 2000);
 
+    // Prepare names list
+    let nameList = names;
+    if (nameList.length === 0 && userProvidedNames) {
+        nameList = userProvidedNames.split(',').map(n => n.trim()).filter(n => n.length > 0);
+    }
+
     try {
       // Pass custom prompt from settings
-      const analysisResult = await analyzeCharacter(src, focusLabels, settings.analysisPrompt);
+      const analysisResult = await analyzeCharacter(src, focusLabels, settings.analysisPrompt, nameList);
       setResult(analysisResult);
       setAppState(AppState.RESULT);
     } catch (error) {
@@ -149,16 +175,21 @@ export const App: React.FC = () => {
   };
 
   const handleSelectionConfirm = () => {
-    const selectedLabels = detectedPeople
-      .filter(p => selectedPeopleIds.has(p.id))
-      .map(p => p.label);
-      
-    if (selectedLabels.length === 0) {
+    const selectedPeople = detectedPeople.filter(p => selectedPeopleIds.has(p.id));
+    
+    if (selectedPeople.length === 0 && detectedPeople.length > 0) {
         alert("لطفا حداقل یک نفر را انتخاب کنید");
         return;
     }
 
-    runAnalysis(imageSrc, selectedLabels);
+    const selectedLabels = selectedPeople.map(p => p.label);
+    
+    // Collect names ONLY for selected people
+    const names = selectedPeople
+        .map(p => personNames[p.id])
+        .filter(n => n && n.trim().length > 0);
+
+    runAnalysis(imageSrc, selectedLabels, names);
   };
 
   const togglePersonSelection = (id: string) => {
@@ -170,6 +201,13 @@ export const App: React.FC = () => {
     }
     setSelectedPeopleIds(newSet);
   };
+  
+  const handleNameChange = (id: string, name: string) => {
+      setPersonNames(prev => ({
+          ...prev,
+          [id]: name
+      }));
+  };
 
   // --- Story Mode Functions ---
 
@@ -180,10 +218,23 @@ export const App: React.FC = () => {
 
   const handleStoryCaptureFinish = async (images: string[]) => {
     setStoryImages(images);
+    setUserProvidedNames('');
+    
+    if (settings.askUserForName) {
+        setAppState(AppState.NAME_INPUT);
+    } else {
+        startStoryGeneration(images);
+    }
+  };
+  
+  const startStoryGeneration = async (images: string[]) => {
     setAppState(AppState.STORY_LOADING);
     
     const totalSteps = 1 + images.length;
     let currentStep = 0;
+    
+    // Prepare names
+    const nameList = userProvidedNames.split(',').map(n => n.trim()).filter(n => n.length > 0);
 
     const updateProgress = (msg: string) => {
         currentStep++;
@@ -206,7 +257,7 @@ export const App: React.FC = () => {
     });
 
     try {
-        const story = await generatePartyStory(images, settings.storyPrompt, settings.storyFocusMode, settings.storyLength);
+        const story = await generatePartyStory(images, settings.storyPrompt, settings.storyFocusMode, settings.storyLength, nameList);
         updateProgress("سناریو نوشته شد! در حال ضبط صدا...");
 
         const pagesWithAudio = [];
@@ -254,6 +305,17 @@ export const App: React.FC = () => {
     setStoryResult(null);
     setLoadingProgress(null);
     setIsSceneMode(false);
+    setUserProvidedNames('');
+    setPersonNames({});
+  };
+  
+  const handleNameSubmit = () => {
+      if (storyImages.length > 0) {
+          startStoryGeneration(storyImages);
+      } else {
+          // Fallback for when we came from NAME_INPUT (e.g. no faces found)
+          runAnalysis(imageSrc, []);
+      }
   };
 
   // Combine default and custom themes
@@ -373,31 +435,94 @@ export const App: React.FC = () => {
         />
       )}
 
+      {/* NAME INPUT SCREEN (FALLBACK for Story Mode or No Faces) */}
+      {appState === AppState.NAME_INPUT && (
+         <div className="w-full max-w-md flex flex-col items-center min-h-[80vh] animate-fade-in px-4">
+             <h2 className="text-2xl font-bold mb-6 text-purple-300">معرفی افراد</h2>
+             <div className="w-full bg-gray-800/50 p-6 rounded-2xl border border-white/10 space-y-4">
+                 <p className="text-gray-300 text-center mb-2">
+                     اسم افرادی که توی عکس هستن رو بنویس تا با اسم خودشون شوخی کنم!
+                 </p>
+                 <input 
+                    type="text" 
+                    value={userProvidedNames}
+                    onChange={(e) => setUserProvidedNames(e.target.value)}
+                    placeholder="مثلاً: علی، مریم، حسن"
+                    className="w-full bg-black/40 border border-gray-600 rounded-xl p-4 text-white text-lg focus:border-purple-500 outline-none text-center"
+                    autoFocus
+                 />
+                 <p className="text-xs text-gray-500 text-center">
+                     (می‌تونی خالی بذاری تا خودم براشون لقب انتخاب کنم)
+                 </p>
+             </div>
+             
+             <div className="flex gap-4 w-full mt-auto">
+                <button 
+                    onClick={resetApp}
+                    className="p-4 rounded-xl bg-gray-800 hover:bg-gray-700 transition"
+                >
+                    <ArrowLeft />
+                </button>
+                <button 
+                    onClick={handleNameSubmit}
+                    className="flex-1 py-4 rounded-xl font-bold text-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-900/40 hover:scale-[1.02] transition"
+                >
+                    تایید و ادامه
+                </button>
+            </div>
+         </div>
+      )}
+
       {appState === AppState.SELECTION && (
         <div className="w-full max-w-md flex flex-col items-center min-h-[80vh] animate-fade-in">
-            <h2 className="text-2xl font-bold mb-6">کیا رو تحلیل کنم؟</h2>
+            <h2 className="text-2xl font-bold mb-6">انتخاب افراد</h2>
             
             <div className="relative w-full h-56 mb-6 rounded-2xl overflow-hidden border border-white/10 shadow-lg">
                  <img src={imageSrc} alt="Preview" className="w-full h-full object-cover" />
                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
             </div>
 
-            <div className="w-full space-y-3 mb-8 px-2 overflow-y-auto max-h-60 no-scrollbar">
+            <p className="text-gray-400 text-sm mb-4">
+                {settings.askUserForName 
+                    ? "افراد رو انتخاب کن و اسمشون رو بنویس:" 
+                    : "روی افرادی که میخوای تحلیل بشن کلیک کن:"}
+            </p>
+
+            <div className="w-full space-y-3 mb-8 px-2 overflow-y-auto max-h-80 no-scrollbar">
                 {detectedPeople.map((person) => (
                     <div 
                         key={person.id}
-                        onClick={() => togglePersonSelection(person.id)}
-                        className={`p-4 rounded-xl flex items-center justify-between cursor-pointer transition-all duration-200 border ${
+                        className={`p-3 rounded-xl transition-all duration-200 border flex flex-col gap-2 ${
                             selectedPeopleIds.has(person.id) 
-                            ? 'bg-purple-600/30 border-purple-500' 
-                            : 'bg-gray-800/50 border-gray-700 hover:bg-gray-800'
+                            ? 'bg-purple-900/20 border-purple-500' 
+                            : 'bg-gray-800/50 border-gray-700'
                         }`}
                     >
-                        <span className="text-lg">{person.label}</span>
-                        {selectedPeopleIds.has(person.id) ? (
-                            <CheckCircle2 className="text-green-400 w-6 h-6" />
-                        ) : (
-                            <Circle className="text-gray-500 w-6 h-6" />
+                        <div 
+                            className="flex items-center justify-between cursor-pointer"
+                            onClick={() => togglePersonSelection(person.id)}
+                        >
+                            <span className="text-lg text-gray-200">{person.label}</span>
+                            {selectedPeopleIds.has(person.id) ? (
+                                <CheckCircle2 className="text-green-400 w-6 h-6" />
+                            ) : (
+                                <Circle className="text-gray-500 w-6 h-6" />
+                            )}
+                        </div>
+                        
+                        {/* Inline Name Input */}
+                        {settings.askUserForName && selectedPeopleIds.has(person.id) && (
+                            <div className="flex items-center gap-2 mt-1 animate-fade-in">
+                                <User className="w-4 h-4 text-purple-400" />
+                                <input 
+                                    type="text"
+                                    placeholder="اسم این شخص (اختیاری)"
+                                    value={personNames[person.id] || ''}
+                                    onChange={(e) => handleNameChange(person.id, e.target.value)}
+                                    className="flex-1 bg-black/40 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:border-purple-400 outline-none"
+                                    onClick={(e) => e.stopPropagation()}
+                                />
+                            </div>
                         )}
                     </div>
                 ))}
