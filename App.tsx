@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Camera, Sparkles, PartyPopper, CheckCircle2, Circle, ArrowLeft, BookOpen, Clock, Settings, Armchair } from 'lucide-react';
 import { analyzeCharacter, analyzeScene, detectPeopleInImage, generatePartyStory, generateRoastAudio } from './services/geminiService';
@@ -33,7 +34,7 @@ export const App: React.FC = () => {
   // Load settings and themes from local storage on mount
   useEffect(() => {
     // Load Settings
-    const savedSettings = localStorage.getItem('partyApp_settings_v8');
+    const savedSettings = localStorage.getItem('partyApp_settings_v11');
     if (savedSettings) {
         try {
             const parsed = JSON.parse(savedSettings);
@@ -57,7 +58,7 @@ export const App: React.FC = () => {
 
   const saveSettings = (newSettings: AppSettings) => {
       setSettings(newSettings);
-      localStorage.setItem('partyApp_settings_v8', JSON.stringify(newSettings));
+      localStorage.setItem('partyApp_settings_v11', JSON.stringify(newSettings));
       setAppState(AppState.HOME);
   };
 
@@ -95,10 +96,10 @@ export const App: React.FC = () => {
     setAppState(AppState.LOADING);
     
     if (isSceneMode) {
-        // Direct Scene Analysis
+        // Direct Scene Analysis using the specific Scene Prompt
         setLoadingMessage("در حال بررسی محیط و اشیاء...");
         try {
-            const analysisResult = await analyzeScene(src, settings.analysisPrompt);
+            const analysisResult = await analyzeScene(src, settings.scenePrompt);
             setResult(analysisResult);
             setAppState(AppState.RESULT);
         } catch (error) {
@@ -205,7 +206,7 @@ export const App: React.FC = () => {
     });
 
     try {
-        const story = await generatePartyStory(images, settings.storyPrompt, settings.storyFocusMode);
+        const story = await generatePartyStory(images, settings.storyPrompt, settings.storyFocusMode, settings.storyLength);
         updateProgress("سناریو نوشته شد! در حال ضبط صدا...");
 
         const pagesWithAudio = [];
@@ -278,7 +279,7 @@ export const App: React.FC = () => {
                     <PartyPopper className="w-10 h-10 text-white" />
                 </div>
                 <h1 className="text-4xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-500 to-red-500">
-                    روایتگر
+                    داستانگو
                 </h1>
                 <p className="text-gray-400 text-lg">
                     داستان‌سرای هوشمند برای مهمونی‌ها
@@ -296,15 +297,15 @@ export const App: React.FC = () => {
 
             <div className="w-full space-y-4">
                 <button 
-                    onClick={() => { setIsSceneMode(false); setAppState(AppState.CAMERA); }}
-                    className="w-full group flex items-center justify-between p-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 transition-all duration-200 transform hover:scale-[1.02] shadow-xl shadow-blue-900/30"
+                    onClick={startStoryMode}
+                    className="w-full group flex items-center justify-between p-6 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 transition-all duration-200 transform hover:scale-[1.02] shadow-xl shadow-pink-900/30"
                 >
                     <div className="text-right">
-                        <span className="block text-xl font-bold">تحلیل شخصیت</span>
-                        <span className="text-indigo-200 text-sm">یه عکس بگیر و نقشش رو ببین!</span>
+                        <span className="block text-xl font-bold">داستان‌سازی</span>
+                        <span className="text-pink-200 text-sm">چند تا عکس بگیر تا قصه بسازم</span>
                     </div>
                     <div className="bg-white/20 p-3 rounded-full">
-                        <Camera className="w-8 h-8 text-white" />
+                        <BookOpen className="w-8 h-8 text-white" />
                     </div>
                 </button>
 
@@ -320,17 +321,17 @@ export const App: React.FC = () => {
                         <Armchair className="w-8 h-8 text-white" />
                     </div>
                 </button>
-
+                
                 <button 
-                    onClick={startStoryMode}
-                    className="w-full group flex items-center justify-between p-6 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 transition-all duration-200 transform hover:scale-[1.02] shadow-xl shadow-pink-900/30"
+                    onClick={() => { setIsSceneMode(false); setAppState(AppState.CAMERA); }}
+                    className="w-full group flex items-center justify-between p-6 rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 transition-all duration-200 transform hover:scale-[1.02] shadow-xl shadow-blue-900/30"
                 >
                     <div className="text-right">
-                        <span className="block text-xl font-bold">داستان‌سازی</span>
-                        <span className="text-pink-200 text-sm">چند تا عکس بگیر تا قصه بسازم</span>
+                        <span className="block text-xl font-bold">تحلیل شخصیت</span>
+                        <span className="text-indigo-200 text-sm">یه عکس بگیر و نقشش رو ببین!</span>
                     </div>
                     <div className="bg-white/20 p-3 rounded-full">
-                        <BookOpen className="w-8 h-8 text-white" />
+                        <Camera className="w-8 h-8 text-white" />
                     </div>
                 </button>
             </div>

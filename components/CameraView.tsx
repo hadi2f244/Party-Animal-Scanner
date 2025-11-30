@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from 'react';
 import { RefreshCw, X, Check, Plus, Image as ImageIcon, AlertTriangle } from 'lucide-react';
 
@@ -24,8 +23,10 @@ export const CameraView: React.FC<CameraViewProps> = ({ onCapture, onClose, mult
   const [capturedImages, setCapturedImages] = useState<string[]>([]);
 
   // CONSTANTS FOR IMAGE OPTIMIZATION
-  const MAX_IMAGE_SIZE = 800; // Reduced from 1024 to prevent Rpc/XHR errors
-  const IMAGE_QUALITY = 0.6;  // Reduced from 0.7
+  // Aggressively reduced to prevent "Rpc failed due to xhr error" (Code 6)
+  // This error happens when payload size is too large for the proxy/network.
+  const MAX_IMAGE_SIZE = 640; 
+  const IMAGE_QUALITY = 0.5;
 
   useEffect(() => {
     let isMounted = true;
@@ -222,7 +223,7 @@ export const CameraView: React.FC<CameraViewProps> = ({ onCapture, onClose, mult
          </button>
          
          <span className="text-white font-bold text-lg shadow-sm drop-shadow-md">
-            {multiMode ? `داستان‌ساز (${capturedImages.length})` : 'روایتگر'}
+            {multiMode ? `داستان‌ساز (${capturedImages.length})` : 'داستانگو'}
          </span>
          
          {/* Top Right: Finish Button (Only for MultiMode) */}

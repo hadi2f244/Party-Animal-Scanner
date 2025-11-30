@@ -1,7 +1,8 @@
 
+
 import React, { useState, useEffect } from 'react';
-import { AppSettings, DEFAULT_SETTINGS, GameTheme, StoryFocusMode } from '../types';
-import { Save, RotateCcw, X, Settings as SettingsIcon, CheckCircle2, Edit3, Plus, Trash2, ChevronDown, ChevronUp, User, Armchair } from 'lucide-react';
+import { AppSettings, DEFAULT_SETTINGS, GameTheme, StoryFocusMode, StoryLength } from '../types';
+import { Save, RotateCcw, X, Settings as SettingsIcon, CheckCircle2, Edit3, Plus, Trash2, ChevronDown, ChevronUp, User, Armchair, AlignJustify, AlignLeft, AlignCenter } from 'lucide-react';
 
 interface SettingsViewProps {
   currentSettings: AppSettings;
@@ -57,6 +58,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         ...prev,
         selectedThemeId: theme.id,
         analysisPrompt: theme.analysisPrompt,
+        scenePrompt: theme.scenePrompt, // Update scene prompt too
         storyPrompt: theme.storyPrompt,
         ttsStylePrompt: theme.ttsStylePrompt,
         voiceName: theme.voiceName
@@ -80,6 +82,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         voiceName: 'Zephyr', // Default voice
         isCustom: true,
         analysisPrompt: `تو ${newThemeLabel} هستی یا راوی این دنیا هستی. وظیفه: تحلیل فرد بر اساس این نقش. \n${newThemeRolePrompt}\n${commonContext}`,
+        scenePrompt: `تو ${newThemeLabel} هستی. وظیفه: تحلیل و مسخره کردن محیط، دکوراسیون و اشیاء با این لحن.`,
         storyPrompt: `تو راوی داستانی در دنیای "${newThemeLabel}" هستی. یک ماجرا درباره این شخصیت‌ها در محیط عکس بساز.`,
         ttsStylePrompt: `متن را با لحنی که مناسب فضای "${newThemeLabel}" است بخوان.`
     };
@@ -96,6 +99,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const handleFocusChange = (mode: StoryFocusMode) => {
       handleChange('storyFocusMode', mode);
   };
+  
+  const handleLengthChange = (len: StoryLength) => {
+      handleChange('storyLength', len);
+  }
 
   // Filter themes for display
   const displayedThemes = showAllThemes 
@@ -108,7 +115,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="absolute top-0 left-0 right-0 p-4 bg-gray-900/90 backdrop-blur-md border-b border-gray-800 shadow-lg z-20 flex items-center justify-between">
         <div className="flex items-center gap-2 text-white">
           <SettingsIcon className="w-6 h-6 text-purple-400" />
-          <h2 className="text-xl font-bold">تنظیمات روایتگر</h2>
+          <h2 className="text-xl font-bold">تنظیمات داستانگو</h2>
         </div>
         <button 
           onClick={onClose}
@@ -124,8 +131,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {/* Story Focus Settings */}
         <div className="space-y-3">
              <label className="block text-green-300 font-bold text-lg mb-2">
-                تمرکز روایت و داستان
+                تنظیمات داستان و روایت
             </label>
+            
+            {/* Focus Toggle */}
             <div className="flex bg-gray-900 p-1 rounded-xl border border-gray-700">
                 <button 
                     onClick={() => handleFocusChange('people_only')}
@@ -150,7 +159,48 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     <span>ترکیب محیط و اشیاء</span>
                 </button>
             </div>
-            <p className="text-xs text-gray-400 pr-2">
+
+            {/* Length Toggle */}
+            <div className="mt-2">
+                <p className="text-gray-400 text-sm mb-2">طول داستان:</p>
+                <div className="flex bg-gray-900 p-1 rounded-xl border border-gray-700">
+                    <button 
+                        onClick={() => handleLengthChange('short')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg transition-all text-sm ${
+                            settings.storyLength === 'short'
+                            ? 'bg-indigo-600 text-white shadow-md'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                    >
+                        <AlignLeft size={16} />
+                        <span>کوتاه</span>
+                    </button>
+                    <button 
+                        onClick={() => handleLengthChange('medium')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg transition-all text-sm ${
+                            settings.storyLength === 'medium'
+                            ? 'bg-indigo-600 text-white shadow-md'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                    >
+                        <AlignCenter size={16} />
+                        <span>متوسط</span>
+                    </button>
+                    <button 
+                        onClick={() => handleLengthChange('long')}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg transition-all text-sm ${
+                            settings.storyLength === 'long'
+                            ? 'bg-indigo-600 text-white shadow-md'
+                            : 'text-gray-400 hover:text-white'
+                        }`}
+                    >
+                        <AlignJustify size={16} />
+                        <span>طولانی</span>
+                    </button>
+                </div>
+            </div>
+
+            <p className="text-xs text-gray-400 pr-2 mt-2">
                 در حالت "ترکیب محیط"، راوی علاوه بر افراد، به اسباب و اثاثیه، به هم ریختگی و جزئیات پس‌زمینه هم گیر می‌دهد!
             </p>
         </div>
@@ -268,13 +318,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="space-y-6 opacity-80 hover:opacity-100 transition-opacity">
             <div className="flex items-center gap-2 text-gray-400">
                 <Edit3 className="w-4 h-4" />
-                <h3 className="text-sm font-bold uppercase tracking-wider">ویرایش دستی پرامپت انتخاب شده</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wider">ویرایش دستی پرامپت‌ها</h3>
             </div>
 
             {/* Analysis Prompt */}
             <div className="space-y-2">
             <label className="block text-purple-300 font-bold text-sm">
-                دستورالعمل تحلیل شخصیت
+                دستورالعمل تحلیل شخصیت (Character)
             </label>
             <textarea
                 value={settings.analysisPrompt}
@@ -282,14 +332,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     handleChange('analysisPrompt', e.target.value);
                     handleChange('selectedThemeId', 'custom_edited'); // Switch to custom if edited
                 }}
-                className="w-full h-32 bg-black/20 border border-gray-700 rounded-xl p-3 text-gray-300 focus:border-purple-500 outline-none transition text-xs leading-relaxed resize-none"
+                className="w-full h-28 bg-black/20 border border-gray-700 rounded-xl p-3 text-gray-300 focus:border-purple-500 outline-none transition text-xs leading-relaxed resize-none"
+            />
+            </div>
+
+            {/* Scene Prompt */}
+            <div className="space-y-2">
+            <label className="block text-teal-300 font-bold text-sm">
+                دستورالعمل تحلیل محیط و اشیاء (Scene)
+            </label>
+            <textarea
+                value={settings.scenePrompt}
+                onChange={(e) => {
+                    handleChange('scenePrompt', e.target.value);
+                    handleChange('selectedThemeId', 'custom_edited');
+                }}
+                className="w-full h-28 bg-black/20 border border-gray-700 rounded-xl p-3 text-gray-300 focus:border-teal-500 outline-none transition text-xs leading-relaxed resize-none"
             />
             </div>
 
             {/* Story Prompt */}
             <div className="space-y-2">
             <label className="block text-pink-300 font-bold text-sm">
-                دستورالعمل سناریو
+                دستورالعمل سناریو داستان (Story)
             </label>
             <textarea
                 value={settings.storyPrompt}
@@ -297,7 +362,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                     handleChange('storyPrompt', e.target.value);
                     handleChange('selectedThemeId', 'custom_edited');
                 }}
-                className="w-full h-32 bg-black/20 border border-gray-700 rounded-xl p-3 text-gray-300 focus:border-pink-500 outline-none transition text-xs leading-relaxed resize-none"
+                className="w-full h-28 bg-black/20 border border-gray-700 rounded-xl p-3 text-gray-300 focus:border-pink-500 outline-none transition text-xs leading-relaxed resize-none"
             />
             </div>
         </div>

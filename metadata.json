@@ -1,6 +1,6 @@
 {
-  "name": "Ravayatgar",
-  "description": "A versatile AI narrator that analyzes photos to tell stories in various genres like Wildlife, Mafia, History, and Sci-Fi.",
+  "name": "Dastangoo",
+  "description": "A versatile AI storyteller that analyzes photos to create funny stories and roasts in various genres.",
   "requestFramePermissions": [
     "camera"
   ]

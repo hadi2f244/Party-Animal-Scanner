@@ -1,6 +1,7 @@
 
+
 import { GoogleGenAI, Type, Modality, GenerateContentResponse } from "@google/genai";
-import { AnalysisResult, PersonDetected, StoryResult, StoryFocusMode } from "../types";
+import { AnalysisResult, PersonDetected, StoryResult, StoryFocusMode, StoryLength } from "../types";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
@@ -291,7 +292,7 @@ export const generateRoastAudio = async (text: string, stylePrompt: string, voic
   }
 };
 
-export const generatePartyStory = async (base64Images: string[], customPrompt: string, focusMode: StoryFocusMode = 'mixed_env'): Promise<StoryResult> => {
+export const generatePartyStory = async (base64Images: string[], customPrompt: string, focusMode: StoryFocusMode = 'mixed_env', length: StoryLength = 'medium'): Promise<StoryResult> => {
   const parts: any[] = [];
   
   base64Images.forEach(img => {
@@ -304,9 +305,22 @@ export const generatePartyStory = async (base64Images: string[], customPrompt: s
     });
   });
 
-  let pageLimitInstruction = "";
+  // Length Instruction Logic
+  let lengthInstruction = "";
   if (base64Images.length === 1) {
-      pageLimitInstruction = "RESTRICTION: Since there is only 1 image, create ONLY 1 story page. Do not repeat the image multiple times.";
+      lengthInstruction = "RESTRICTION: Since there is only 1 image, create ONLY 1 story page (1 Paragraph). Do not repeat the image multiple times.";
+  } else {
+      switch (length) {
+          case 'short':
+              lengthInstruction = "LENGTH CONSTRAINT: Keep it SHORT. Generate 1-2 pages maximum. Be concise.";
+              break;
+          case 'medium':
+              lengthInstruction = "LENGTH CONSTRAINT: Medium length. Generate 3-4 pages. Balanced detail.";
+              break;
+          case 'long':
+              lengthInstruction = "LENGTH CONSTRAINT: Long narrative. Generate 5-6 pages. Elaborate on details and dialogue.";
+              break;
+      }
   }
 
   // Focus Mode Instruction
@@ -326,7 +340,7 @@ export const generatePartyStory = async (base64Images: string[], customPrompt: s
     3. LOGIC: Link the photos into a funny, disastrous narrative.
     4. FORMAT: Valid JSON.
     ${focusInstruction}
-    ${pageLimitInstruction}
+    ${lengthInstruction}
     
     JSON Structure:
     {

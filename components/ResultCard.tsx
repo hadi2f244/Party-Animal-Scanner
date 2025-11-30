@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { AnalysisResult } from '../types';
 import { Share2, RotateCcw, Volume2, Loader2, StopCircle, Download, Music, Video } from 'lucide-react';
@@ -176,7 +175,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
           
           const link = document.createElement('a');
           link.href = url;
-          link.download = `ravayatgar-${Date.now()}.wav`;
+          link.download = `dastangoo-${Date.now()}.wav`;
           link.click();
           URL.revokeObjectURL(url);
       } catch (e) {
@@ -209,7 +208,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
           });
 
           const link = document.createElement('a');
-          link.download = `ravayatgar-card-${Date.now()}.png`;
+          link.download = `dastangoo-card-${Date.now()}.png`;
           link.href = canvas.toDataURL('image/png');
           link.click();
       } catch (e) {
@@ -288,7 +287,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `ravayatgar-video-${Date.now()}.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`;
+                a.download = `dastangoo-video-${Date.now()}.${mimeType.includes('mp4') ? 'mp4' : 'webm'}`;
                 a.click();
                 URL.revokeObjectURL(url);
                 resolve();
@@ -483,7 +482,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, imageSrc, onRese
             </div>
             
             <div className="text-gray-600 text-xs font-mono opacity-50 pt-2">
-                AI Party Scanner • Ravayatgar
+                AI Party Scanner • Dastangoo
             </div>
         </div>
       </div>

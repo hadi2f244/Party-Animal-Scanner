@@ -1,4 +1,5 @@
 
+
 export interface AnalysisResult {
   characterTitle: string;
   description: string;
@@ -48,25 +49,52 @@ export interface GameTheme {
   emoji: string;
   description: string;
   voiceName: string;
-  analysisPrompt: string;
-  storyPrompt: string;
+  analysisPrompt: string; // For People
+  scenePrompt: string;    // For Environment/Objects
+  storyPrompt: string;    // For Stories
   ttsStylePrompt: string;
   isCustom?: boolean;
 }
 
 export type StoryFocusMode = 'people_only' | 'mixed_env';
+export type StoryLength = 'short' | 'medium' | 'long';
 
 // Relaxed context instruction
 const COMMON_CONTEXT_INSTRUCTION = `
 CONTEXT RULE:
-Check the background. If there is something funny (like a messy room, strange decor, or bad lighting), mention it. Otherwise, focus on roasting the person.
+Check the background. If there is something funny (like a messy room, strange decor, or bad lighting), mention it. Otherwise, focus on roasting the subject.
 `;
 
-// ... (Note: Keeping the GAME_THEMES array as is, assuming it exists in the file. 
-// Since I am replacing the whole file content in XML, I must include the full content or the user's setup might break if I truncate.
-// However, the prompt implies "Update files". I will provide the FULL content including the recently added themes.)
-
 export const GAME_THEMES: GameTheme[] = [
+  {
+    id: 'documentary',
+    label: 'راز بقا (حیات وحش)',
+    emoji: '🦁',
+    description: 'گونه‌های عجیب در طبیعت',
+    voiceName: 'Fenrir',
+    analysisPrompt: `ROLE: You are a cynical wildlife narrator.
+    TASK: Roast this human as a clumsy animal.
+    CRITICAL: Mock their appearance using wildlife terms (mating dance, hibernation).
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: Scientific name.
+    - subtitle: Survival Status.
+    - description: A harsh documentary observation about their lack of skills.
+    ${COMMON_CONTEXT_INSTRUCTION}`,
+    scenePrompt: `ROLE: You are a Wildlife Narrator observing a habitat.
+    TASK: Analyze the environment as a "Nest" or "Territory".
+    CRITICAL: Describe the mess as "Nesting material". Describe objects as "Tools for primitive survival".
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: Habitat Name.
+    - subtitle: Hygiene Level.
+    - description: Narrate how this environment is unsuitable for a healthy alpha male/female.`,
+    storyPrompt: `A comedy wildlife script.
+    - Theme: The creature fails at hunting and mating.
+    - Tone: Scientific mockery.
+    OUTPUT LANGUAGE: Persian (Farsi).`,
+    ttsStylePrompt: 'با صدای بسیار بم، عمیق، آرام و حماسی. دقیقاً مثل گوینده مستندهای نشنال جئوگرافیک.'
+  },
   {
     id: 'khastegari',
     label: 'جلسه خواستگاری',
@@ -82,11 +110,19 @@ export const GAME_THEMES: GameTheme[] = [
     - subtitle: The Verdict (e.g. "Rejected due to socks").
     - description: A monologue complaining to your neighbor about this person.
     ${COMMON_CONTEXT_INSTRUCTION}`,
+    scenePrompt: `ROLE: You are the Mother-in-Law checking the suitor's house/room.
+    TASK: Analyze the ENVIRONMENT for cleanliness and wealth.
+    CRITICAL: Roast the furniture ("Is this dowry or trash?"), the dust, the fruits, and the decor.
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: Title of the House (e.g. "Matrookeh").
+    - subtitle: Cleanliness Score.
+    - description: Judge the housekeeping skills based on the background objects.`,
     storyPrompt: `A disaster Khastegari story.
     - Theme: Arguments about Dowry (Mehr), spilling tea, sweating groom.
     - Tone: Gossip, judgmental.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'با لحن بسیار جدی، خشک و قضاوت‌گر. مثل مادری که اصلا از وضعیت راضی نیست.'
+    ttsStylePrompt: 'با لحن پیرزن غرغرو، پر از کنایه و پچ‌پچ. مثل مادرشوهری که دارد زیر لب غیبت می‌کند و ایراد می‌گیرد.'
   },
   {
     id: 'looti',
@@ -103,18 +139,26 @@ export const GAME_THEMES: GameTheme[] = [
     - subtitle: Street Cred.
     - description: Roast them for holding a phone instead of a dagger.
     ${COMMON_CONTEXT_INSTRUCTION}`,
+    scenePrompt: `ROLE: You are an old Looti inspecting the neighborhood (Mahalleh).
+    TASK: Analyze the objects and room.
+    CRITICAL: Is this a place for men? Roast "Soft" objects like cushions or flowers. Look for the Samovar.
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: Name of the Hangout (e.g. "Ghahve Khaneh Soosool-ha").
+    - subtitle: Masculinity Level.
+    - description: Complain that this place lacks "Maram" and "Marefat".`,
     storyPrompt: `A story in a traditional Teahouse.
     - Theme: Trying to fight but slipping on a melon skin.
     - Tone: Deep voice, exaggerated slang.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'با صدای بسیار کلفت، بم و کاملا جدی. مثل فیلم‌های قدیمی.'
+    ttsStylePrompt: 'با صدای کلفت، گردن‌کلفت و جاهلی. با لحن لات‌های قدیم تهران و فیلم‌فارسی.'
   },
   {
     id: 'shomal',
     label: 'سفر شمال (جوجه‌باز)',
     emoji: '🏖️',
     description: 'ترافیک، ویلا، زیرشلواری',
-    voiceName: 'Zephyr',
+    voiceName: 'Puck',
     analysisPrompt: `ROLE: You are a Villa Dealer in Northern Iran.
     TASK: Roast this tourist. They look like an amateur.
     CRITICAL: Mock their outfit. Mention "Jujeh Kebab" and "Traffic".
@@ -124,11 +168,19 @@ export const GAME_THEMES: GameTheme[] = [
     - subtitle: Accessory (e.g. "Badban").
     - description: Describe them standing in the rain thinking it's romantic.
     ${COMMON_CONTEXT_INSTRUCTION}`,
+    scenePrompt: `ROLE: You are a Villa Dealer checking a rental property.
+    TASK: Analyze the location.
+    CRITICAL: Is it damp (Rutubat)? Is the view fake? Roast the cheap plastic chairs or the BBQ setup.
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: Villa Name (e.g. "Vila-ye Nam-dar").
+    - subtitle: Distance to Sea.
+    - description: Criticize the facilities and claim the price is too high for this "Stable".`,
     storyPrompt: `A weekend trip to Shomal gone wrong.
     - Theme: Rain, expensive villa, burnt kebab.
     - Tone: Energetic, complaining.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'با صدای سریع و بازاری، اما کاملا جدی در حال معامله.'
+    ttsStylePrompt: 'با صدای بلند، سریع، هیجان‌زده و بازاری. مثل دلال ویلا که می‌خواهد مشتری را جوگیر کند.'
   },
   {
     id: 'taxi',
@@ -145,18 +197,26 @@ export const GAME_THEMES: GameTheme[] = [
     - subtitle: Diagnosis.
     - description: A lecture about how this person causes inflation.
     ${COMMON_CONTEXT_INSTRUCTION}`,
+    scenePrompt: `ROLE: You are a Taxi Driver stuck in traffic, looking at the street/room.
+    TASK: Analyze the infrastructure.
+    CRITICAL: Connect the objects in the photo to "Bad Management" and "World Politics".
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: Location Analysis.
+    - subtitle: Traffic Status.
+    - description: Arant about how the placement of that chair proves the economy is failing.`,
     storyPrompt: `A taxi ride conversation.
     - Theme: Solving world problems in a broken Paykan.
     - Tone: Preachy, confident, wrong.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'با لحن تحلیلگر سیاسی، بسیار شمرده و حق‌به‌جانب.'
+    ttsStylePrompt: 'با لحن آرام، خسته، اما بسیار مطمئن و حق‌به‌جانب. مثل راننده‌ای که همه چیز را می‌داند و نصیحت می‌کند.'
   },
   {
     id: 'qajar',
     label: 'شازده قجری',
     emoji: '👑',
     description: 'اندرونی و بادمجان دور قاب',
-    voiceName: 'Zephyr',
+    voiceName: 'Charon',
     analysisPrompt: `ROLE: You are a satirical Court Jester in Qajar court.
     TASK: Roast this "Prince/Princess". They are lazy.
     CRITICAL: Mock their weight or sleepy eyes using polite royal words.
@@ -166,11 +226,19 @@ export const GAME_THEMES: GameTheme[] = [
     - subtitle: Position.
     - description: Describe them waiting for a servant to peel a cucumber.
     ${COMMON_CONTEXT_INSTRUCTION}`,
+    scenePrompt: `ROLE: You are the Royal Treasurer visiting the Harem/Palace.
+    TASK: Analyze the room's luxury.
+    CRITICAL: Roast the cheap decor. Compare it to the "Golestan Palace". Is the Hookah (Ghelyoon) ready?
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: Room Title (e.g. "Andarooni-ye Fagheer").
+    - subtitle: Treasury Status.
+    - description: Mock the lack of gold and jewels in the environment.`,
     storyPrompt: `Chronicle of a lazy royal.
     - Theme: Eating all the royal kebabs.
     - Tone: Flowery archaic Persian but insulting.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'با لحن بسیار فاخر، ادبی و متکبرانه.'
+    ttsStylePrompt: 'با لحن بسیار آهسته، فاخر، پرافاده و بی‌حال. مثل شازده‌ای که حوصله حرف زدن ندارد.'
   },
   {
     id: 'intellectual',
@@ -187,18 +255,26 @@ export const GAME_THEMES: GameTheme[] = [
     - subtitle: Mood.
     - description: Roast their attempt to look deep.
     ${COMMON_CONTEXT_INSTRUCTION}`,
+    scenePrompt: `ROLE: You are an Art Critic reviewing a space.
+    TASK: Analyze the vibe/decor.
+    CRITICAL: Is it "Minimal" or just empty? Roast the lighting. Is it depressing enough?
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: Exhibition Title.
+    - subtitle: Depression Level.
+    - description: A pretentious critique of the walls and objects.`,
     storyPrompt: `A poetry night disaster.
     - Theme: Reading nonsense poems.
     - Tone: Slow, whispery, fake-deep.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'با صدایی آرام، افسرده، پوچ و بسیار فلسفی.'
+    ttsStylePrompt: 'با صدایی آرام، کش‌دار، خسته، نالان و بسیار فلسفی. با مکث‌های طولانی.'
   },
   {
     id: 'mafia',
     label: 'مافیای پلاستیکی',
     emoji: '🔫',
     description: 'گادفادرِ نازی‌آباد',
-    voiceName: 'Fenrir',
+    voiceName: 'Charon',
     analysisPrompt: `ROLE: You are The Godfather.
     TASK: Roast this new recruit. They look like a school principal, not a gangster.
     CRITICAL: Tell them they hold their phone like a water gun.
@@ -208,32 +284,19 @@ export const GAME_THEMES: GameTheme[] = [
     - subtitle: Rank.
     - description: Explain why they are a disgrace to the family.
     ${COMMON_CONTEXT_INSTRUCTION}`,
+    scenePrompt: `ROLE: You are a Crime Scene Investigator or Mafia Boss checking a safehouse.
+    TASK: Analyze the room for security and style.
+    CRITICAL: Is this a good place for a hit? Roast the furniture for looking cheap/weak.
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: Location Code Name.
+    - subtitle: Security Risk.
+    - description: Analyze the layout as a failed crime scene.`,
     storyPrompt: `A failed mafia job.
     - Theme: Scared of the dark during a heist.
     - Tone: Aggressive, threatening, serious.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'کاملا جدی، ترسناک و تهدیدآمیز. مثل دون کورلئونه.'
-  },
-  {
-    id: 'documentary',
-    label: 'راز بقا (حیات وحش)',
-    emoji: '🦁',
-    description: 'گونه‌های عجیب در طبیعت',
-    voiceName: 'Fenrir',
-    analysisPrompt: `ROLE: You are a cynical wildlife narrator.
-    TASK: Roast this human as a clumsy animal.
-    CRITICAL: Mock their appearance using wildlife terms (mating dance, hibernation).
-    OUTPUT LANGUAGE: Persian (Farsi).
-    JSON FIELDS:
-    - characterTitle: Scientific name.
-    - subtitle: Survival Status.
-    - description: A harsh documentary observation about their lack of skills.
-    ${COMMON_CONTEXT_INSTRUCTION}`,
-    storyPrompt: `A comedy wildlife script.
-    - Theme: The creature fails at hunting and mating.
-    - Tone: Scientific mockery.
-    OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'با صدای بسیار بم، عمیق و حماسی. مثل نشنال جئوگرافیک.'
+    ttsStylePrompt: 'با صدای خشن، گرفته، مرموز و تهدیدآمیز. مثل دون کورلئونه که آرام صحبت می‌کند.'
   },
   {
     id: 'vikings',
@@ -250,11 +313,19 @@ export const GAME_THEMES: GameTheme[] = [
     - subtitle: Achievement.
     - description: A saga about their failure to lift a sword.
     ${COMMON_CONTEXT_INSTRUCTION}`,
+    scenePrompt: `ROLE: You are a Viking Raider looting a house.
+    TASK: Analyze the loot (objects).
+    CRITICAL: Is there any gold? Roast the "weak" modern furniture. "This chair cannot withstand a feast!"
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: Village Name.
+    - subtitle: Loot Value.
+    - description: Scream about how useless these modern objects are for Valhalla.`,
     storyPrompt: `The Saga of the Weakest Viking.
     - Theme: Scared of a goose during a raid.
     - Tone: Epic but describing pathetic things.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'بسیار حماسی، خشن و جنگجویانه.'
+    ttsStylePrompt: 'با فریاد حماسی، خشن، پر انرژی و جنگجویانه. انگار وسط میدان نبرد است.'
   },
   {
     id: 'cyberpunk',
@@ -271,28 +342,40 @@ export const GAME_THEMES: GameTheme[] = [
     - subtitle: Status.
     - description: Analytical roast of their glitches.
     ${COMMON_CONTEXT_INSTRUCTION}`,
+    scenePrompt: `ROLE: You are a Cybernetic Scanner analyzing a sector.
+    TASK: Analyze the environment tech level.
+    CRITICAL: Identify objects as "Obsolete Tech". Roast the "Low Poly" resolution of the room.
+    OUTPUT LANGUAGE: Persian (Farsi).
+    JSON FIELDS:
+    - characterTitle: Sector Name.
+    - subtitle: Tech Level.
+    - description: A robotic analysis of how primitive and dirty this environment is.`,
     storyPrompt: `A hacker mission fail.
     - Theme: Downloading a virus instead of money.
     - Tone: Robotic, cold.
     OUTPUT LANGUAGE: Persian (Farsi).`,
-    ttsStylePrompt: 'صدای کاملا رباتیک، بی‌احساس، سرد و ماشینی.'
+    ttsStylePrompt: 'با صدای کاملا رباتیک، بدون احساس، سرد، ماشینی و مقطع.'
   }
 ];
 
 export interface AppSettings {
   analysisPrompt: string;
+  scenePrompt: string;
   storyPrompt: string;
   ttsStylePrompt: string;
   selectedThemeId: string;
   voiceName: string;
   storyFocusMode: StoryFocusMode;
+  storyLength: StoryLength;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
   analysisPrompt: GAME_THEMES[0].analysisPrompt,
+  scenePrompt: GAME_THEMES[0].scenePrompt,
   storyPrompt: GAME_THEMES[0].storyPrompt,
   ttsStylePrompt: GAME_THEMES[0].ttsStylePrompt,
   selectedThemeId: GAME_THEMES[0].id,
   voiceName: GAME_THEMES[0].voiceName,
-  storyFocusMode: 'mixed_env'
+  storyFocusMode: 'mixed_env',
+  storyLength: 'medium'
 };
